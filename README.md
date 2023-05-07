@@ -1,5 +1,7 @@
-# example-community-template
+# gtm-server-instector-template
 
-The example-community-template project is an example of a Google Tag Manager [Community Template Gallery template repository](https://support.google.com/tagmanager/answer/9454109) repository that can be used as a template to generate new community template repositories.
+Use this template to let Avo Inspector monitor the health of your tracking and help you improve it.
 
-To submit your own template, see the [detailed instructions on how to submit templates to the Community Template Gallery](https://developers.google.com/tag-manager/templates/gallery).
+Learn more about Avo Inspector [here](https://www.avo.app/docs/data-design/start-using-inspector)
+
+> Note: No user data is sent to Avo.
