@@ -1,4 +1,4 @@
-# gtm-server-instector-template
+# GTM Server tag Avo Instector template
 
 Use this template to let Avo Inspector monitor the health of your tracking and help you improve it.
 
