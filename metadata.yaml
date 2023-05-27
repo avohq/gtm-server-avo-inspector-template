@@ -15,5 +15,5 @@
 homepage: "https://www.avo.app"
 documentation: "https://www.avo.app/docs/data-design/start-using-inspector"
 versions:
-  - sha: f2e89d3f9bdd67f8ce4ebebf5a00ef793819d973
+  - sha: 311f03d8cdd61748e017647bb752352fbaed49b3
     changeNotes: Initial Version
