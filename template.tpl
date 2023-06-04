@@ -68,7 +68,6 @@ const getTimestampMillis = require('getTimestampMillis');
 const getType = require('getType');
 const JSON = require('JSON');
 const generateRandom = require('generateRandom');
-const logToConsole = require('logToConsole');
 const getAllEventData = require('getAllEventData');
 const getClientName = require('getClientName');
 const sendHttpRequest = require('sendHttpRequest');
@@ -77,19 +76,14 @@ let sessionId = "";
 
 let gtmEvent = getAllEventData();
 
-logToConsole(gtmEvent);
-
 let schemasToSend = [];
-logToConsole(schemasToSend);
 const sessionBody = handleSession(gtmEvent);
 if (sessionBody && schemasToSend.length == 0) {
   schemasToSend.push(sessionBody);
 }
-logToConsole(schemasToSend);
 
 const eventBody = handleEvent(gtmEvent);
 schemasToSend.push(eventBody);
-logToConsole(schemasToSend);
 
 if (schemasToSend.length > 0) {
   sendData(schemasToSend);
@@ -126,10 +120,8 @@ function handleEvent(gtmEvent) {
   let eventBody = generateBaseBody(gtmEvent);
   eventBody.type = 'event';
   eventBody.eventName = gtmEvent.event_name;
-  logToConsole(eventBody);
   eventBody.eventProperties = extractSchema(gtmEvent);
   eventBody.sessionId = sessionId;
-  logToConsole("2", eventBody);
 
   return eventBody;
 }
@@ -138,8 +130,6 @@ function sendData(body) {
   const endpoint = 'https://api.avo.app/inspector/gtm/v1/track';
   const postBody = JSON.stringify(body);
 
-  logToConsole("Sending", postBody);
-  
   sendHttpRequest(endpoint, {
     headers: {
       'accept': 'application/json',
@@ -150,12 +140,9 @@ function sendData(body) {
     method: 'POST',
     timeout: 500,
   }, postBody).then((result) => {
-     logToConsole("Network request result: ", result.body ? result.body : result, "code", result.statusCode);
     if (result.statusCode >= 200 && result.statusCode < 300) {
-      logToConsole("data.gtmOnSuccess()");
       data.gtmOnSuccess();
     } else {
-      logToConsole("Failed with", result.status);
       data.gtmOnFailure();
     }
   });
@@ -201,7 +188,6 @@ function extractSchema(gtmEvent) {
     if (getType(object) === 'object') {
       let mappedResult = [];
       for (var key in object) {
-        logToConsole("checking", key, "common", commonFields);
         if (object.hasOwnProperty(key) && !arrayContains(commonFields, key)) {
           let val = object[key];
 
