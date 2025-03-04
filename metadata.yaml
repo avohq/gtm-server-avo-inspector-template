@@ -16,7 +16,7 @@ homepage: "https://www.avo.app"
 documentation: "https://www.avo.app/docs/data-design/start-using-inspector"
 versions:
   #Latest version
-  - sha: 5e3bcb10a11fa4e8dc890ce08657edcbc21138c7
+  - sha: 72047fbf349edc260e8e467e774725448905cdc5
     changeNotes: |2
       Upping timeout to 2000ms.
       Adding catch to return to GTM failure if request fails.
