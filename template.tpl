@@ -138,13 +138,15 @@ function sendData(body) {
       'env': data.environment,
     },
     method: 'POST',
-    timeout: 500,
+    timeout: 2000,
   }, postBody).then((result) => {
     if (result.statusCode >= 200 && result.statusCode < 300) {
       data.gtmOnSuccess();
     } else {
       data.gtmOnFailure();
     }
+  }).catch((error) => {
+    data.gtmOnFailure();
   });
 }
 
