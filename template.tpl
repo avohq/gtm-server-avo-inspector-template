@@ -72,23 +72,17 @@ const getAllEventData = require('getAllEventData');
 const getClientName = require('getClientName');
 const sendHttpRequest = require('sendHttpRequest');
 
-let sessionId = "";
-
 let gtmEvent = getAllEventData();
-
-let schemasToSend = [];
-const sessionBody = handleSession(gtmEvent);
-if (sessionBody && schemasToSend.length == 0) {
-  schemasToSend.push(sessionBody);
-}
-
 const eventBody = handleEvent(gtmEvent);
-schemasToSend.push(eventBody);
+validateEvent(gtmEvent, eventBody, function(validatedBody) {
+  sendData([validatedBody]);
+});
 
-if (schemasToSend.length > 0) {
-  sendData(schemasToSend);
-} else {
-  data.gtmOnSuccess();
+function extractAnonymousId(gtmEvent) {
+  if (gtmEvent.client_id) return gtmEvent.client_id;
+  if (gtmEvent.user_id) return gtmEvent.user_id;
+  if (gtmEvent['x-ga-js_client_id']) return gtmEvent['x-ga-js_client_id'];
+  return '';
 }
 
 function generateBaseBody(gtmEvent) {
@@ -98,22 +92,13 @@ function generateBaseBody(gtmEvent) {
       gtmEvent.page_hostname != null ? gtmEvent.page_hostname : 'unnamed GTM server-side tag',
     env: data.environment,
     appVersion: 'unversioned GTM server-side tag',
-    libVersion: '1.0.0',
-    libPlatform: getClientName(), 
+    libVersion: '2.0.0',
+    libPlatform: getClientName(),
     messageId: uniqueid(gtmEvent.event_name),
     createdAt: getTimestampMillis().toString(),
+    anonymousId: extractAnonymousId(gtmEvent),
     avoFunction: false
   };
-}
-
-function handleSession(gtmEvent) {
-  let sessionBody = generateBaseBody(gtmEvent);
-  sessionBody.type = 'sessionStarted';
-  sessionBody.sessionId = uniqueid();
-  
-  sessionId = sessionBody.sessionId;
-
-  return sessionBody;
 }
 
 function handleEvent(gtmEvent) {
@@ -121,9 +106,59 @@ function handleEvent(gtmEvent) {
   eventBody.type = 'event';
   eventBody.eventName = gtmEvent.event_name;
   eventBody.eventProperties = extractSchema(gtmEvent);
-  eventBody.sessionId = sessionId;
 
   return eventBody;
+}
+
+function validateEvent(gtmEvent, eventBody, callback) {
+  const specUrl = 'https://api.avo.app/inspector/v1/spec?apiKey=' + data.inspectorKey + '&env=' + data.environment;
+
+  sendHttpRequest(specUrl, {
+    headers: { 'accept': 'application/json' },
+    method: 'GET',
+    timeout: 500,
+  }).then((result) => {
+    if (result.statusCode >= 200 && result.statusCode < 300) {
+      const spec = JSON.parse(result.body);
+      const eventSpec = findEventSpec(spec, gtmEvent.event_name);
+      if (eventSpec) {
+        eventBody.streamId = uniqueid(gtmEvent.event_name);
+        eventBody.eventSpecMetadata = {
+          eventId: eventSpec.id,
+          eventHash: eventSpec.hash
+        };
+        eventBody.validationResults = validateProperties(gtmEvent, eventSpec);
+      }
+    }
+    callback(eventBody);
+  }).catch(function() {
+    callback(eventBody);
+  });
+}
+
+function findEventSpec(spec, eventName) {
+  if (!spec || !spec.events) return null;
+  for (var i = 0; i < spec.events.length; i++) {
+    if (spec.events[i].name === eventName) return spec.events[i];
+  }
+  return null;
+}
+
+function validateProperties(gtmEvent, eventSpec) {
+  var results = [];
+  if (!eventSpec.properties) return results;
+  for (var i = 0; i < eventSpec.properties.length; i++) {
+    var prop = eventSpec.properties[i];
+    var actualValue = gtmEvent[prop.name];
+    var actualType = getPropValueType(actualValue);
+    results.push({
+      propertyName: prop.name,
+      expectedType: prop.type,
+      actualType: actualType,
+      valid: prop.type === actualType || (prop.optional && actualType === 'null')
+    });
+  }
+  return results;
 }
 
 function sendData(body) {
@@ -340,16 +375,191 @@ ___SERVER_PERMISSIONS___
 ___TESTS___
 
 scenarios:
-- name: Sends an event
+- name: Sends an event with anonymousId and no session
   code: |-
     const mockData = {
-      whatevet: "0",
-      shouldNotChange: "1"
+      inspectorKey: "test-key",
+      environment: "dev"
     };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'purchase',
+        client_id: 'test-client-123',
+        page_hostname: 'example.com',
+        item_name: 'Test Product',
+        price: 9.99
+      };
+    });
+
+    mock('getClientName', function() {
+      return 'test_client';
+    });
+
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/v1/spec') !== -1) {
+        return Promise.create(function(resolve) {
+          resolve({
+            statusCode: 200,
+            body: JSON.stringify({ events: [] })
+          });
+        });
+      }
+      return Promise.create(function(resolve) {
+        resolve({ statusCode: 200 });
+      });
+    });
 
     runCode(mockData);
 
     assertApi('sendHttpRequest').wasCalled();
+    assertApi('sendHttpRequest').wasCalledWith(
+      'https://api.avo.app/inspector/v1/spec?apiKey=test-key&env=dev',
+      { headers: { accept: 'application/json' }, method: 'GET', timeout: 500 }
+    );
+
+- name: Uses client_id as anonymousId
+  code: |-
+    const mockData = {
+      inspectorKey: "test-key",
+      environment: "dev"
+    };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'test_event',
+        client_id: 'client-abc',
+        user_id: 'user-xyz'
+      };
+    });
+
+    mock('getClientName', function() {
+      return 'test_client';
+    });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
+        capturedTrackBody = body;
+      }
+      return Promise.create(function(resolve) {
+        resolve({ statusCode: 200, body: '{"events":[]}' });
+      });
+    });
+
+    runCode(mockData);
+
+    assertApi('sendHttpRequest').wasCalled();
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].anonymousId).isEqualTo('client-abc');
+
+- name: Falls back to empty string when no ID fields present
+  code: |-
+    const mockData = {
+      inspectorKey: "test-key",
+      environment: "dev"
+    };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'test_event',
+        page_hostname: 'example.com'
+      };
+    });
+
+    mock('getClientName', function() {
+      return 'test_client';
+    });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
+        capturedTrackBody = body;
+      }
+      return Promise.create(function(resolve) {
+        resolve({ statusCode: 200, body: '{"events":[]}' });
+      });
+    });
+
+    runCode(mockData);
+
+    assertApi('sendHttpRequest').wasCalled();
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].anonymousId).isEqualTo('');
+
+- name: Falls back to user_id when client_id absent
+  code: |-
+    const mockData = {
+      inspectorKey: "test-key",
+      environment: "dev"
+    };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'test_event',
+        user_id: 'user-xyz',
+        page_hostname: 'example.com'
+      };
+    });
+
+    mock('getClientName', function() {
+      return 'test_client';
+    });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
+        capturedTrackBody = body;
+      }
+      return Promise.create(function(resolve) {
+        resolve({ statusCode: 200, body: '{"events":[]}' });
+      });
+    });
+
+    runCode(mockData);
+
+    assertApi('sendHttpRequest').wasCalled();
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].anonymousId).isEqualTo('user-xyz');
+
+- name: Falls back to x-ga-js_client_id when client_id and user_id absent
+  code: |-
+    const mockData = {
+      inspectorKey: "test-key",
+      environment: "dev"
+    };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'test_event',
+        'x-ga-js_client_id': 'js-client-456',
+        page_hostname: 'example.com'
+      };
+    });
+
+    mock('getClientName', function() {
+      return 'test_client';
+    });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
+        capturedTrackBody = body;
+      }
+      return Promise.create(function(resolve) {
+        resolve({ statusCode: 200, body: '{"events":[]}' });
+      });
+    });
+
+    runCode(mockData);
+
+    assertApi('sendHttpRequest').wasCalled();
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].anonymousId).isEqualTo('js-client-456');
 
 
 ___NOTES___
