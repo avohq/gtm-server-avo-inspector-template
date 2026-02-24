@@ -74,6 +74,7 @@ const sendHttpRequest = require('sendHttpRequest');
 const log = require('logToConsole');
 const getContainerVersion = require('getContainerVersion');
 const Math = require('Math');
+const encodeUriComponent = require('encodeUriComponent');
 
 const isPreview = getContainerVersion().previewMode;
 
@@ -127,8 +128,8 @@ function handleEvent(gtmEvent, streamId) {
 
 function fetchAndValidate(gtmEvent, eventBody, streamId, callback) {
   const specUrl = 'https://api.avo.app/trackingPlan/eventSpec?apiKey=' +
-    data.inspectorKey + '&streamId=' + streamId +
-    '&eventName=' + gtmEvent.event_name;
+    encodeUriComponent(data.inspectorKey) + '&streamId=' + encodeUriComponent(streamId) +
+    '&eventName=' + encodeUriComponent(gtmEvent.event_name);
 
   sendHttpRequest(specUrl, {
     headers: { 'accept': 'application/json' },
@@ -144,12 +145,17 @@ function fetchAndValidate(gtmEvent, eventBody, streamId, callback) {
         var validationMap = buildValidationResults(
           gtmEvent, parsedSpec.events
         );
-        // Merge failedEventIds into eventProperties
+        // Merge validation results into eventProperties (whichever is shorter: failed or passed)
         for (var pi = 0; pi < eventBody.eventProperties.length; pi++) {
           var prop = eventBody.eventProperties[pi];
           var valResult = validationMap[prop.propertyName];
-          if (valResult && valResult.failedEventIds) {
-            prop.failedEventIds = valResult.failedEventIds;
+          if (valResult) {
+            if (valResult.failedEventIds) {
+              prop.failedEventIds = valResult.failedEventIds;
+            }
+            if (valResult.passedEventIds) {
+              prop.passedEventIds = valResult.passedEventIds;
+            }
           }
         }
       }
@@ -956,10 +962,23 @@ scenarios:
     const parsed = JSON.parse(capturedTrackBody);
     assertThat(parsed[0].eventSpecMetadata.schemaId).isEqualTo('schema-123');
     assertThat(parsed[0].eventSpecMetadata.branchId).isEqualTo('branch-456');
-    assertThat(parsed[0].validationResults).isNotEqualTo(undefined);
-    assertThat(parsed[0].validationResults.currency.passedEventIds).isNotEqualTo(undefined);
-    assertThat(parsed[0].validationResults.price.passedEventIds).isNotEqualTo(undefined);
-    assertThat(parsed[0].validationResults.item_name.passedEventIds).isNotEqualTo(undefined);
+    // Validation results are merged into eventProperties (passedEventIds or failedEventIds, whichever shorter)
+    const props = parsed[0].eventProperties;
+    let currencyProp = null;
+    let priceProp = null;
+    let itemNameProp = null;
+    for (let i = 0; i < props.length; i++) {
+      if (props[i].propertyName === 'currency') currencyProp = props[i];
+      if (props[i].propertyName === 'price') priceProp = props[i];
+      if (props[i].propertyName === 'item_name') itemNameProp = props[i];
+    }
+    // All properties pass validation in this test, so passedEventIds should be set
+    assertThat(currencyProp).isNotEqualTo(null);
+    assertThat(currencyProp.passedEventIds).isNotEqualTo(undefined);
+    assertThat(priceProp).isNotEqualTo(null);
+    assertThat(priceProp.passedEventIds).isNotEqualTo(undefined);
+    assertThat(itemNameProp).isNotEqualTo(null);
+    assertThat(itemNameProp.passedEventIds).isNotEqualTo(undefined);
 
 
 ___NOTES___
