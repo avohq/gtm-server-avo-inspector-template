@@ -105,8 +105,11 @@ function generateBaseBody(gtmEvent) {
     libVersion: '2.0.0',
     libPlatform: getClientName(),
     messageId: uniqueid(gtmEvent.event_name),
-    createdAt: getTimestampMillis().toString(),
+    trackingId: '',
+    createdAt: toISOString(getTimestampMillis()),
+    sessionId: '',
     anonymousId: extractAnonymousId(gtmEvent),
+    samplingRate: 1,
     avoFunction: false
   };
 }
@@ -388,16 +391,39 @@ function buildValidationResult(failedIds, passedIds, allIds) {
   return result;
 }
 
+function toISOString(timestampMs) {
+  var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+  var s = timestampMs / 1000;
+  var sec = Math.floor(s) % 60;
+  var min = Math.floor(s / 60) % 60;
+  var hr = Math.floor(s / 3600) % 24;
+  var days = Math.floor(s / 86400);
+  // Approximate date from days since epoch (good enough for ISO string)
+  var y = 1970; var m = 0; var d = days;
+  var daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31];
+  while (true) {
+    var isLeap = (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0);
+    var diy = isLeap ? 366 : 365;
+    if (d < diy) break;
+    d -= diy;
+    y++;
+  }
+  daysInMonth[1] = ((y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0)) ? 29 : 28;
+  while (d >= daysInMonth[m]) {
+    d -= daysInMonth[m];
+    m++;
+  }
+  return y + '-' + pad(m + 1) + '-' + pad(d + 1) + 'T' + pad(hr) + ':' + pad(min) + ':' + pad(sec) + '.000Z';
+}
+
 function sendData(body) {
-  const endpoint = 'https://api.avo.app/inspector/gtm/v1/track';
+  const endpoint = 'https://api.avo.app/inspector/v1/track';
   const postBody = JSON.stringify(body);
-  
+
   sendHttpRequest(endpoint, {
     headers: {
       'accept': 'application/json',
       'content-type': 'application/json',
-      'api-key': data.inspectorKey,
-      'env': data.environment,
     },
     method: 'POST',
     timeout: 500,
