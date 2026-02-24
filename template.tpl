@@ -141,9 +141,17 @@ function fetchAndValidate(gtmEvent, eventBody, streamId, callback) {
 
       if (parsedSpec) {
         eventBody.eventSpecMetadata = parsedSpec.metadata;
-        eventBody.validationResults = buildValidationResults(
+        var validationMap = buildValidationResults(
           gtmEvent, parsedSpec.events
         );
+        // Merge failedEventIds into eventProperties
+        for (var pi = 0; pi < eventBody.eventProperties.length; pi++) {
+          var prop = eventBody.eventProperties[pi];
+          var valResult = validationMap[prop.propertyName];
+          if (valResult && valResult.failedEventIds) {
+            prop.failedEventIds = valResult.failedEventIds;
+          }
+        }
       }
     }
     callback(eventBody);
@@ -488,7 +496,10 @@ function extractSchema(gtmEvent) {
 
           let mappedEntry = {
             propertyName: key,
-            propertyType: getPropValueType(val)
+            propertyType: getPropValueType(val),
+            children: null,
+            encryptedPropertyValue: null,
+            failedEventIds: null
           };
 
           if (getType(val) === 'object' && val != null) {
