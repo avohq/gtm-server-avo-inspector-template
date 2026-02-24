@@ -78,7 +78,7 @@ const Math = require('Math');
 const isPreview = getContainerVersion().previewMode;
 
 let gtmEvent = getAllEventData();
-const streamId = uniqueid(gtmEvent.event_name);
+const streamId = extractAnonymousId(gtmEvent);
 const eventBody = handleEvent(gtmEvent, streamId);
 
 if (data.environment === 'dev' || data.environment === 'staging') {
