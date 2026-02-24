@@ -482,7 +482,8 @@ function extractSchema(gtmEvent) {
     if (getType(object) === 'object') {
       let mappedResult = [];
       for (var key in object) {
-        if (object.hasOwnProperty(key) && !arrayContains(commonFields, key)) {
+        if (object.hasOwnProperty(key) && !arrayContains(commonFields, key) &&
+          key.indexOf('x-sst-') !== 0 && key.indexOf('x-ga-') !== 0) {
           let val = object[key];
 
           let mappedEntry = {
