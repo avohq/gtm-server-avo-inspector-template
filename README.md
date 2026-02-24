@@ -6,36 +6,31 @@ Learn more about Avo Inspector [here](https://www.avo.app/docs/data-design/start
 
 > Note: No user data is sent to Avo.
 
-## Anonymous ID (Model D)
+## Event Validation (dev/staging only)
 
-This template uses a best-effort server-side approach to determine an anonymous ID for each event. The extraction follows this priority order:
+In development and staging environments, events are validated against the tracking plan spec fetched from the Avo API. The spec is fetched per request using the `/trackingPlan/eventSpec` endpoint, matching the same approach used by the Android and iOS Inspector SDKs.
 
-1. `client_id` -- the GA4 client ID passed from the browser
-2. `user_id` -- the user ID if set by the application
-3. `x-ga-js_client_id` -- the GA4 JavaScript client ID header
-4. Empty string fallback if none of the above are available
+Validation includes constraint checks:
 
-No session tracking is performed. Each tag execution is stateless.
+- **Type checking** -- verifies the property value type matches the spec
+- **Required/optional** -- fails if a required property is missing
+- **Pinned values** -- exact match required for specific event/variant combinations
+- **Allowed values** -- value must be in the allowed set
+- **Min/max ranges** -- numeric bounds checking
 
-## Event Validation
+Regex validation is not supported in GTM Server's sandboxed JavaScript environment and is silently skipped.
 
-Events are validated against the tracking plan spec fetched from the Avo API on each tag execution. Because GTM Server tags are stateless (no cross-request memory), the spec is fetched per request -- there is no LRU cache or persistent storage between executions.
+In production, events are sent directly without spec fetching or validation, optimizing for throughput.
 
-Validated events include:
-
-- `streamId` -- a unique identifier for the validation stream
-- `eventSpecMetadata` -- the event ID and hash from the tracking plan spec
-- `validationResults` -- per-property validation results comparing expected vs actual types
-
-If the spec fetch fails or the event is not found in the spec, the event is still sent without validation metadata.
+If the spec fetch fails in dev/staging, the event is still sent without validation metadata.
 
 ## Encryption Limitation
 
 **Encryption is NOT supported in the GTM Server template.**
 
-GTM Server uses a sandboxed JavaScript environment that does not provide access to cryptographic APIs (such as `crypto.subtle`, Node.js `crypto`, or any equivalent). As a result, payload encryption cannot be implemented in this context.
+GTM Server uses a sandboxed JavaScript environment that does not provide access to cryptographic APIs (such as `crypto.subtle`, Node.js `crypto`, or any equivalent). As a result, property value encryption cannot be implemented in this context. Without encryption, property values are not sent to Avo.
 
-If encryption is a requirement, consider using a server-side SDK in a non-sandboxed environment instead.
+If property value validation is a requirement, consider using a client-side SDK or a server-side SDK in a non-sandboxed environment instead.
 
 ## How to publish an update
 
