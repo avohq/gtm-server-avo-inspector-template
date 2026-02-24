@@ -419,7 +419,7 @@ function toISOString(timestampMs) {
 }
 
 function sendData(body) {
-  const endpoint = 'https://api.avo.app/inspector/v1/track';
+  const endpoint = 'https://api.avo.app/inspector/gtm/v1/track';
   const postBody = JSON.stringify(body);
 
   sendHttpRequest(endpoint, {
