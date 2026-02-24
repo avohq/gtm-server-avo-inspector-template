@@ -129,7 +129,7 @@ function fetchAndValidate(gtmEvent, eventBody, streamId, callback) {
   sendHttpRequest(specUrl, {
     headers: { 'accept': 'application/json' },
     method: 'GET',
-    timeout: 500,
+    timeout: 5000,
   }).then(function(result) {
     if (result.statusCode >= 200 && result.statusCode < 300) {
       const specResponse = JSON.parse(result.body);
