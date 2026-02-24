@@ -426,6 +426,8 @@ function sendData(body) {
     headers: {
       'accept': 'application/json',
       'content-type': 'application/json',
+      'api-key': data.inspectorKey,
+      'env': data.environment,
     },
     method: 'POST',
     timeout: 500,
