@@ -73,6 +73,7 @@ const getClientName = require('getClientName');
 const sendHttpRequest = require('sendHttpRequest');
 const log = require('logToConsole');
 const getContainerVersion = require('getContainerVersion');
+const Math = require('Math');
 
 const isPreview = getContainerVersion().previewMode;
 
