@@ -398,20 +398,21 @@ function toISOString(timestampMs) {
   var min = Math.floor(s / 60) % 60;
   var hr = Math.floor(s / 3600) % 24;
   var days = Math.floor(s / 86400);
-  // Approximate date from days since epoch (good enough for ISO string)
-  var y = 1970; var m = 0; var d = days;
+  var y = 1970;
+  var m = 0;
+  var d = days;
   var daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31];
   while (true) {
     var isLeap = (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0);
     var diy = isLeap ? 366 : 365;
     if (d < diy) break;
-    d -= diy;
-    y++;
+    d = d - diy;
+    y = y + 1;
   }
   daysInMonth[1] = ((y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0)) ? 29 : 28;
   while (d >= daysInMonth[m]) {
-    d -= daysInMonth[m];
-    m++;
+    d = d - daysInMonth[m];
+    m = m + 1;
   }
   return y + '-' + pad(m + 1) + '-' + pad(d + 1) + 'T' + pad(hr) + ':' + pad(min) + ':' + pad(sec) + '.000Z';
 }
