@@ -6,6 +6,15 @@ Learn more about Avo Inspector [here](https://www.avo.app/docs/data-design/start
 
 > Note: No user data is sent to Avo.
 
+## Anonymous ID / Stream ID
+
+The template automatically resolves an anonymous ID from the event data to use as the stream identifier. It checks the following fields in priority order:
+
+1. `client_id`
+2. `x-ga-js_client_id`
+
+`user_id` is intentionally excluded — it is typically a known, authenticated identifier and would break anonymity. If none of the above are present, an empty string is used.
+
 ## Event Validation (dev/staging only)
 
 In development and staging environments, events are validated against the tracking plan spec fetched from the Avo API. The spec is fetched per request using the `/trackingPlan/eventSpec` endpoint.
