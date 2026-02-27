@@ -92,7 +92,6 @@ if (data.environment === 'dev' || data.environment === 'staging') {
 
 function extractAnonymousId(gtmEvent) {
   if (gtmEvent.client_id) return gtmEvent.client_id;
-  if (gtmEvent.user_id) return gtmEvent.user_id;
   if (gtmEvent['x-ga-js_client_id']) return gtmEvent['x-ga-js_client_id'];
   return '';
 }
@@ -687,8 +686,7 @@ scenarios:
     mock('getAllEventData', function() {
       return {
         event_name: 'test_event',
-        client_id: 'client-abc',
-        user_id: 'user-xyz'
+        client_id: 'client-abc'
       };
     });
 
@@ -756,7 +754,7 @@ scenarios:
     const parsed = JSON.parse(capturedTrackBody);
     assertThat(parsed[0].anonymousId).isEqualTo('');
 
-- name: Falls back to user_id when client_id absent
+- name: Does not use user_id as anonymousId (must stay anonymous)
   code: |-
     const mockData = {
       inspectorKey: "test-key",
@@ -794,9 +792,9 @@ scenarios:
     assertApi('sendHttpRequest').wasCalled();
     assertThat(capturedTrackBody).isNotEqualTo(null);
     const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].anonymousId).isEqualTo('user-xyz');
+    assertThat(parsed[0].anonymousId).isEqualTo('');
 
-- name: Falls back to x-ga-js_client_id when client_id and user_id absent
+- name: Falls back to x-ga-js_client_id when client_id absent
   code: |-
     const mockData = {
       inspectorKey: "test-key",
