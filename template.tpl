@@ -276,7 +276,10 @@ function validatePropertyValues(actualValue, propSpec, eventId, variantIds) {
     for (var pinnedValue in propSpec.p) {
       if (!propSpec.p.hasOwnProperty(pinnedValue)) continue;
       var pinnedEventIds = propSpec.p[pinnedValue];
-      var actualStr = getType(actualValue) === 'object' ? JSON.stringify(actualValue) : '' + actualValue;
+      var actualTypeName = getType(actualValue);
+      var actualStr = (actualTypeName === 'object' || actualTypeName === 'array')
+        ? JSON.stringify(actualValue)
+        : '' + actualValue;
       if (actualStr !== pinnedValue) {
         for (var pi = 0; pi < pinnedEventIds.length; pi++) {
           if (!arrayContains(failedIds, pinnedEventIds[pi])) {
