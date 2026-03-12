@@ -23,6 +23,7 @@ versions:
       Payload aligned with Inspector SDK v2 format (libVersion 2.0.0, ISO 8601 timestamps, streamId, samplingRate).
       Filters out internal x-sst- and x-ga- prefixed properties from the event schema.
       Encryption not supported: GTM Server sandbox does not provide cryptographic APIs; encryptedPropertyValue is always null.
+  # Older versions
   - sha: 6cd894ddb96df3d005fb6157c14edf80e03f86eb
     changeNotes: |2
       Bump template version to 2 and update description to reflect anonymous ID resolution and dev/staging validation.
@@ -32,7 +33,6 @@ versions:
       Local value validation (dev/staging only): fetches the tracking plan spec from the Avo API and validates event properties against type, required, pinned value, allowed value, and min/max range constraints.
       Encryption not supported: GTM Server sandbox does not provide cryptographic APIs; encryptedPropertyValue is always null.
       Filters out internal x-sst- and x-ga- prefixed properties from the event schema.
-  # Older versions
   - sha: 72047fbf349edc260e8e467e774725448905cdc5
     changeNotes: |2
       Upping timeout to 2000ms.
