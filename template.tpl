@@ -495,7 +495,16 @@ function extractSchema(gtmEvent) {
   ];
 
   let mapping = object => {
-    if (getType(object) === 'object') {
+    if (getType(object) === 'array') {
+      // Mirror AvoSchemaParser: recurse into each element, then dedup. This is
+      // what captures the structure of lists-of-objects (double-bracketed
+      // children) and collapses lists-of-primitives to their unique types.
+      let mappedList = [];
+      for (var i = 0; i < object.length; i++) {
+        mappedList.push(mapping(object[i]));
+      }
+      return removeDuplicates(mappedList);
+    } else if (getType(object) === 'object') {
       let mappedResult = [];
       for (var key in object) {
         if (object.hasOwnProperty(key) && !arrayContains(commonFields, key) &&
@@ -510,7 +519,9 @@ function extractSchema(gtmEvent) {
             failedEventIds: null
           };
 
-          if (getType(val) === 'object' && val != null) {
+          // getType() distinguishes 'array' from 'object' (unlike JS typeof, so
+          // arrays must be included explicitly here to recurse into them).
+          if ((getType(val) === 'object' || getType(val) === 'array') && val != null) {
             mappedEntry.children = mapping(val);
           }
 
@@ -537,6 +548,38 @@ function arrayContains(a, obj) {
        }
     }
     return false;
+}
+
+// Ported from AvoSchemaParser.removeDuplicates. Dedups primitives by value
+// (boolean/number/string kept in separate buckets so 0, false and "0" never
+// collide) and objects/arrays by reference. Keeps the schema payload small for
+// large lists (e.g. a list of many identical primitives collapses to one
+// entry), which matters because oversized events are dropped downstream.
+function removeDuplicates(array) {
+  var seenPrimitives = {};
+  var seenObjects = [];
+  var result = [];
+
+  for (var i = 0; i < array.length; i++) {
+    var item = array[i];
+    var itemType = getType(item);
+
+    if (itemType === 'boolean' || itemType === 'number' || itemType === 'string') {
+      var key = itemType + ':' + item;
+      if (!seenPrimitives.hasOwnProperty(key)) {
+        seenPrimitives[key] = true;
+        result.push(item);
+      }
+    } else {
+      // Objects/arrays are compared by reference, matching AvoSchemaParser.
+      if (!arrayContains(seenObjects, item)) {
+        seenObjects.push(item);
+        result.push(item);
+      }
+    }
+  }
+
+  return result;
 }
 
 function getPropValueType(propValue) {
@@ -998,6 +1041,103 @@ scenarios:
     assertThat(priceProp.passedEventIds).isNotEqualTo(undefined);
     assertThat(itemNameProp).isNotEqualTo(null);
     assertThat(itemNameProp.passedEventIds).isNotEqualTo(undefined);
+
+- name: Captures nested structure of lists (objects, primitives, empty)
+  code: |-
+    const mockData = {
+      inspectorKey: "test-key",
+      environment: "prod"
+    };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'purchase',
+        client_id: 'test-client-123',
+        page_hostname: 'example.com',
+        products: [
+          { sku: 'A1', price: 9, quantity: 2 },
+          { sku: 'B2', price: 4, quantity: 1 }
+        ],
+        tags: ['sale', 'summer', 'sale'],
+        emptyList: [],
+        meta: { source: 'web', ab: true }
+      };
+    });
+
+    mock('getClientName', function() {
+      return 'test_client';
+    });
+
+    mock('getContainerVersion', function() {
+      return { previewMode: false };
+    });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
+        capturedTrackBody = body;
+      }
+      return Promise.create(function(resolve) {
+        resolve({ statusCode: 200 });
+      });
+    });
+
+    runCode(mockData);
+
+    assertApi('sendHttpRequest').wasCalled();
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    const props = parsed[0].eventProperties;
+
+    let productsProp = null;
+    let tagsProp = null;
+    let emptyListProp = null;
+    let metaProp = null;
+    for (let i = 0; i < props.length; i++) {
+      if (props[i].propertyName === 'products') productsProp = props[i];
+      if (props[i].propertyName === 'tags') tagsProp = props[i];
+      if (props[i].propertyName === 'emptyList') emptyListProp = props[i];
+      if (props[i].propertyName === 'meta') metaProp = props[i];
+    }
+
+    // (a) List of objects: children must capture the element structure, not be null.
+    // children is double-bracketed: children[0] is the list of element property entries.
+    assertThat(productsProp).isNotEqualTo(null);
+    assertThat(productsProp.propertyType).isEqualTo('list');
+    assertThat(productsProp.children).isNotEqualTo(null);
+    const elementEntries = productsProp.children[0];
+    assertThat(elementEntries).isNotEqualTo(null);
+    let skuEntry = null;
+    let priceEntry = null;
+    let quantityEntry = null;
+    for (let j = 0; j < elementEntries.length; j++) {
+      if (elementEntries[j].propertyName === 'sku') skuEntry = elementEntries[j];
+      if (elementEntries[j].propertyName === 'price') priceEntry = elementEntries[j];
+      if (elementEntries[j].propertyName === 'quantity') quantityEntry = elementEntries[j];
+    }
+    assertThat(skuEntry).isNotEqualTo(null);
+    assertThat(skuEntry.propertyType).isEqualTo('string');
+    assertThat(priceEntry).isNotEqualTo(null);
+    assertThat(priceEntry.propertyType).isEqualTo('int');
+    assertThat(quantityEntry).isNotEqualTo(null);
+    assertThat(quantityEntry.propertyType).isEqualTo('int');
+
+    // (b) List of primitives: children collapses to the unique element type.
+    assertThat(tagsProp).isNotEqualTo(null);
+    assertThat(tagsProp.propertyType).isEqualTo('list');
+    assertThat(tagsProp.children.length).isEqualTo(1);
+    assertThat(tagsProp.children[0]).isEqualTo('string');
+
+    // (c) Empty list: stays a list with empty (non-null) children.
+    assertThat(emptyListProp).isNotEqualTo(null);
+    assertThat(emptyListProp.propertyType).isEqualTo('list');
+    assertThat(emptyListProp.children).isNotEqualTo(null);
+    assertThat(emptyListProp.children.length).isEqualTo(0);
+
+    // Regression guard: plain nested objects still expose children.
+    assertThat(metaProp).isNotEqualTo(null);
+    assertThat(metaProp.propertyType).isEqualTo('object');
+    assertThat(metaProp.children).isNotEqualTo(null);
 
 
 ___NOTES___
