@@ -954,7 +954,7 @@ scenarios:
         event_name: 'purchase',
         client_id: 'test-client-123',
         page_hostname: 'example.com',
-        currency: 'USD',
+        item_category: 'electronics',
         item_name: 'Test Product',
         price: 50
       };
@@ -974,10 +974,10 @@ scenarios:
           id: 'evt-1',
           vids: ['var-1'],
           p: {
-            currency: {
+            item_category: {
               t: 'string',
               r: true,
-              v: { '["USD","EUR","GBP"]': ['evt-1'] }
+              v: { '["electronics","books","toys"]': ['evt-1'] }
             },
             price: {
               t: 'int',
@@ -1024,19 +1024,21 @@ scenarios:
     const parsed = JSON.parse(capturedTrackBody);
     assertThat(parsed[0].eventSpecMetadata.schemaId).isEqualTo('schema-123');
     assertThat(parsed[0].eventSpecMetadata.branchId).isEqualTo('branch-456');
-    // Validation results are merged into eventProperties (passedEventIds or failedEventIds, whichever shorter)
+    // Validation results are merged into eventProperties (passedEventIds or failedEventIds, whichever shorter).
+    // Note: the validated properties must NOT be common fields (e.g. currency/value), since extractSchema
+    // filters those out of the schema and validation would have nowhere to attach.
     const props = parsed[0].eventProperties;
-    let currencyProp = null;
+    let categoryProp = null;
     let priceProp = null;
     let itemNameProp = null;
     for (let i = 0; i < props.length; i++) {
-      if (props[i].propertyName === 'currency') currencyProp = props[i];
+      if (props[i].propertyName === 'item_category') categoryProp = props[i];
       if (props[i].propertyName === 'price') priceProp = props[i];
       if (props[i].propertyName === 'item_name') itemNameProp = props[i];
     }
     // All properties pass validation in this test, so passedEventIds should be set
-    assertThat(currencyProp).isNotEqualTo(null);
-    assertThat(currencyProp.passedEventIds).isNotEqualTo(undefined);
+    assertThat(categoryProp).isNotEqualTo(null);
+    assertThat(categoryProp.passedEventIds).isNotEqualTo(undefined);
     assertThat(priceProp).isNotEqualTo(null);
     assertThat(priceProp.passedEventIds).isNotEqualTo(undefined);
     assertThat(itemNameProp).isNotEqualTo(null);
