@@ -724,16 +724,18 @@ scenarios:
 
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
-        return Promise.create(function(resolve) {
-          resolve({
+        return { then: function(onResolve) {
+          onResolve({
             statusCode: 200,
             body: JSON.stringify({ events: [] })
           });
-        });
+          return { catch: function() {} };
+        } };
       }
-      return Promise.create(function(resolve) {
-        resolve({ statusCode: 200 });
-      });
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200 });
+        return { catch: function() {} };
+      } };
     });
 
     runCode(mockData);
@@ -767,9 +769,10 @@ scenarios:
       if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
         capturedTrackBody = body;
       }
-      return Promise.create(function(resolve) {
-        resolve({ statusCode: 200, body: '{"events":[]}' });
-      });
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"events":[]}' });
+        return { catch: function() {} };
+      } };
     });
 
     runCode(mockData);
@@ -806,9 +809,10 @@ scenarios:
       if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
         capturedTrackBody = body;
       }
-      return Promise.create(function(resolve) {
-        resolve({ statusCode: 200, body: '{"events":[]}' });
-      });
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"events":[]}' });
+        return { catch: function() {} };
+      } };
     });
 
     runCode(mockData);
@@ -846,9 +850,10 @@ scenarios:
       if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
         capturedTrackBody = body;
       }
-      return Promise.create(function(resolve) {
-        resolve({ statusCode: 200, body: '{"events":[]}' });
-      });
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"events":[]}' });
+        return { catch: function() {} };
+      } };
     });
 
     runCode(mockData);
@@ -857,6 +862,7 @@ scenarios:
     assertThat(capturedTrackBody).isNotEqualTo(null);
     const parsed = JSON.parse(capturedTrackBody);
     assertThat(parsed[0].anonymousId).isEqualTo('');
+    assertThat(parsed[0].streamId).isEqualTo('');   // user_id must NOT become the streamId
 
 - name: Falls back to x-ga-js_client_id when client_id absent
   code: |-
@@ -886,9 +892,10 @@ scenarios:
       if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
         capturedTrackBody = body;
       }
-      return Promise.create(function(resolve) {
-        resolve({ statusCode: 200, body: '{"events":[]}' });
-      });
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"events":[]}' });
+        return { catch: function() {} };
+      } };
     });
 
     runCode(mockData);
@@ -932,9 +939,10 @@ scenarios:
       if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
         trackCalled = true;
       }
-      return Promise.create(function(resolve) {
-        resolve({ statusCode: 200 });
-      });
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200 });
+        return { catch: function() {} };
+      } };
     });
 
     runCode(mockData);
@@ -1002,19 +1010,21 @@ scenarios:
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
-        return Promise.create(function(resolve) {
-          resolve({
+        return { then: function(onResolve) {
+          onResolve({
             statusCode: 200,
             body: JSON.stringify(specResponse)
           });
-        });
+          return { catch: function() {} };
+        } };
       }
       if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
         capturedTrackBody = body;
       }
-      return Promise.create(function(resolve) {
-        resolve({ statusCode: 200 });
-      });
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200 });
+        return { catch: function() {} };
+      } };
     });
 
     runCode(mockData);
@@ -1079,9 +1089,10 @@ scenarios:
       if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
         capturedTrackBody = body;
       }
-      return Promise.create(function(resolve) {
-        resolve({ statusCode: 200 });
-      });
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200 });
+        return { catch: function() {} };
+      } };
     });
 
     runCode(mockData);
