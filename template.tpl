@@ -555,6 +555,12 @@ function arrayContains(a, obj) {
 // collide) and objects/arrays by reference. Keeps the schema payload small for
 // large lists (e.g. a list of many identical primitives collapses to one
 // entry), which matters because oversized events are dropped downstream.
+//
+// Note: as called by mapping(), every scalar is already reduced to its
+// type-name string (via getPropValueType) before it reaches here, so in
+// practice this only ever receives strings (type names) or arrays. The
+// boolean/number buckets are kept for parity with AvoSchemaParser but are not
+// exercised by this template's data flow.
 function removeDuplicates(array) {
   var seenPrimitives = {};
   var seenObjects = [];
@@ -1151,6 +1157,212 @@ scenarios:
     assertThat(metaProp).isNotEqualTo(null);
     assertThat(metaProp.propertyType).isEqualTo('object');
     assertThat(metaProp.children).isNotEqualTo(null);
+
+- name: Dedups list element types; keeps one entry per object element
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'purchase',
+        client_id: 'c1',
+        page_hostname: 'example.com',
+        mixed: [1, 'a', true, 1, 'a'],
+        items: [{ sku: 'A1' }, { color: 'red' }]
+      };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const props = JSON.parse(capturedTrackBody)[0].eventProperties;
+    let mixedProp = null;
+    let itemsProp = null;
+    for (let i = 0; i < props.length; i++) {
+      if (props[i].propertyName === 'mixed') mixedProp = props[i];
+      if (props[i].propertyName === 'items') itemsProp = props[i];
+    }
+    // mixed primitives dedup to their unique type names: int, string, boolean
+    assertThat(mixedProp).isNotEqualTo(null);
+    assertThat(mixedProp.propertyType).isEqualTo('list');
+    assertThat(mixedProp.children.length).isEqualTo(3);
+    // object elements are NOT collapsed (reference dedup): one schema per element
+    assertThat(itemsProp).isNotEqualTo(null);
+    assertThat(itemsProp.children.length).isEqualTo(2);
+
+- name: Spec fetch failure still sends the event (dev)
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "dev" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'x', client_id: 'c1', page_hostname: 'example.com' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let trackCalled = false;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
+        // reject: the .then success handler is skipped, .catch fires
+        return { then: function() { return { catch: function(onReject) { onReject({ message: 'boom' }); } }; } };
+      }
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { trackCalled = true; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(trackCalled).isEqualTo(true);
+
+- name: Captures deeply nested lists (list in object in list)
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'purchase',
+        client_id: 'c1',
+        page_hostname: 'example.com',
+        orders: [ { id: 'o1', items: [ { sku: 'A1' } ] } ]
+      };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const props = JSON.parse(capturedTrackBody)[0].eventProperties;
+    let ordersProp = null;
+    for (let i = 0; i < props.length; i++) {
+      if (props[i].propertyName === 'orders') ordersProp = props[i];
+    }
+    assertThat(ordersProp).isNotEqualTo(null);
+    assertThat(ordersProp.propertyType).isEqualTo('list');
+    // orders.children[0] is the element schema; find its nested 'items' list
+    const orderEntries = ordersProp.children[0];
+    let itemsEntry = null;
+    for (let j = 0; j < orderEntries.length; j++) {
+      if (orderEntries[j].propertyName === 'items') itemsEntry = orderEntries[j];
+    }
+    assertThat(itemsEntry).isNotEqualTo(null);
+    assertThat(itemsEntry.propertyType).isEqualTo('list');
+    // items.children[0] is the innermost element schema; find 'sku'
+    const itemEntries = itemsEntry.children[0];
+    let skuEntry = null;
+    for (let k = 0; k < itemEntries.length; k++) {
+      if (itemEntries[k].propertyName === 'sku') skuEntry = itemEntries[k];
+    }
+    assertThat(skuEntry).isNotEqualTo(null);
+    assertThat(skuEntry.propertyType).isEqualTo('string');
+
+- name: Handles null list elements
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'purchase',
+        client_id: 'c1',
+        page_hostname: 'example.com',
+        flags: [null, null],
+        mixedNull: [null, 'x']
+      };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const props = JSON.parse(capturedTrackBody)[0].eventProperties;
+    let flagsProp = null;
+    let mixedNullProp = null;
+    for (let i = 0; i < props.length; i++) {
+      if (props[i].propertyName === 'flags') flagsProp = props[i];
+      if (props[i].propertyName === 'mixedNull') mixedNullProp = props[i];
+    }
+    // a list of only null elements collapses to a single 'null' element type
+    assertThat(flagsProp).isNotEqualTo(null);
+    assertThat(flagsProp.propertyType).isEqualTo('list');
+    assertThat(flagsProp.children.length).isEqualTo(1);
+    assertThat(flagsProp.children[0]).isEqualTo('null');
+    // null mixed with a string yields two distinct element types
+    assertThat(mixedNullProp.children.length).isEqualTo(2);
+
+- name: Surfaces failedEventIds when a value violates the spec (dev)
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "dev" };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'purchase',
+        client_id: 'c1',
+        page_hostname: 'example.com',
+        price: 500
+      };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    const specResponse = {
+      events: [
+        {
+          id: 'evt-1',
+          vids: [],
+          p: {
+            price: { t: 'int', r: true, minmax: { '0,100': ['evt-1'] } }
+          }
+        }
+      ]
+    };
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
+        return { then: function(onResolve) {
+          onResolve({ statusCode: 200, body: JSON.stringify(specResponse) });
+          return { catch: function() {} };
+        } };
+      }
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const props = JSON.parse(capturedTrackBody)[0].eventProperties;
+    let priceProp = null;
+    for (let i = 0; i < props.length; i++) {
+      if (props[i].propertyName === 'price') priceProp = props[i];
+    }
+    // 500 is outside the 0..100 minmax range -> the event id fails validation
+    assertThat(priceProp).isNotEqualTo(null);
+    assertThat(priceProp.failedEventIds).isNotEqualTo(undefined);
+    assertThat(priceProp.failedEventIds.length).isEqualTo(1);
+    assertThat(priceProp.failedEventIds[0]).isEqualTo('evt-1');
+    assertThat(priceProp.passedEventIds).isEqualTo(undefined);
 
 
 ___NOTES___
