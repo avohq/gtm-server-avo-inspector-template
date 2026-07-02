@@ -742,6 +742,7 @@ ___TESTS___
 scenarios:
 - name: Sends an event with anonymousId and no session (dev with spec fetch)
   code: |-
+    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev"
@@ -787,6 +788,7 @@ scenarios:
 
 - name: Uses client_id as anonymousId
   code: |-
+    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev"
@@ -827,6 +829,7 @@ scenarios:
 
 - name: Falls back to empty string when no ID fields present
   code: |-
+    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev"
@@ -867,6 +870,7 @@ scenarios:
 
 - name: Does not use user_id as anonymousId (must stay anonymous)
   code: |-
+    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev"
@@ -909,6 +913,7 @@ scenarios:
 
 - name: Falls back to x-ga-js_client_id when client_id absent
   code: |-
+    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev"
@@ -995,6 +1000,7 @@ scenarios:
 
 - name: Validates spec with pinned and allowed values
   code: |-
+    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev"
@@ -1099,6 +1105,7 @@ scenarios:
 
 - name: Captures nested structure of lists (objects, primitives, empty)
   code: |-
+    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "prod"
@@ -1197,6 +1204,7 @@ scenarios:
 
 - name: Dedups list element types and keeps one entry per object element
   code: |-
+    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
     mock('getAllEventData', function() {
@@ -1261,6 +1269,7 @@ scenarios:
 
 - name: Captures deeply nested lists (list in object in list)
   code: |-
+    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
     mock('getAllEventData', function() {
@@ -1309,6 +1318,7 @@ scenarios:
 
 - name: Handles null list elements
   code: |-
+    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
     mock('getAllEventData', function() {
@@ -1349,6 +1359,7 @@ scenarios:
 
 - name: Surfaces failedEventIds when a value violates the spec (dev)
   code: |-
+    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "dev" };
 
     mock('getAllEventData', function() {
@@ -1403,6 +1414,7 @@ scenarios:
 
 - name: Excludes common fields from the schema by default
   code: |-
+    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
     mock('getAllEventData', function() {
@@ -1440,6 +1452,7 @@ scenarios:
 
 - name: Includes opted-in common fields in the schema
   code: |-
+    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "prod",
@@ -1499,6 +1512,7 @@ scenarios:
 
 - name: Opted-in common field also appears inside nested objects
   code: |-
+    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "prod",
@@ -1545,6 +1559,7 @@ scenarios:
 
 - name: Unknown or empty include rows change nothing
   code: |-
+    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "prod",
