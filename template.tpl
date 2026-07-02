@@ -1364,6 +1364,42 @@ scenarios:
     assertThat(priceProp.failedEventIds[0]).isEqualTo('evt-1');
     assertThat(priceProp.passedEventIds).isEqualTo(undefined);
 
+- name: Excludes common fields from the schema by default
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'purchase',
+        client_id: 'c1',
+        page_hostname: 'example.com',
+        user_id: 'user-1',
+        currency: 'USD',
+        value: 42,
+        custom_prop: 'hello'
+      };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const props = JSON.parse(capturedTrackBody)[0].eventProperties;
+    let names = [];
+    for (let i = 0; i < props.length; i++) { names.push(props[i].propertyName); }
+    assertThat(names.indexOf('user_id')).isEqualTo(-1);
+    assertThat(names.indexOf('currency')).isEqualTo(-1);
+    assertThat(names.indexOf('value')).isEqualTo(-1);
+    assertThat(names.indexOf('client_id')).isEqualTo(-1);
+    assertThat(names.indexOf('page_hostname')).isEqualTo(-1);
+    assertThat(names.indexOf('custom_prop')).isNotEqualTo(-1);
 
 ___NOTES___
 
