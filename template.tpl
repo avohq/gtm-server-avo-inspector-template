@@ -1195,7 +1195,7 @@ scenarios:
     assertThat(metaProp.propertyType).isEqualTo('object');
     assertThat(metaProp.children).isNotEqualTo(null);
 
-- name: Dedups list element types; keeps one entry per object element
+- name: Dedups list element types and keeps one entry per object element
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
