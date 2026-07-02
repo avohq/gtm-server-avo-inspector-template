@@ -510,6 +510,27 @@ function extractSchema(gtmEvent) {
     "x-ga-js_client_id"
   ];
 
+  // Subtract user-opted-in fields (tag config) from the default exclusion
+  // list. Exact match after trim; unknown names match nothing (fail-safe).
+  // The x-sst-/x-ga- prefix filter below stays unconditional.
+  const included = data.includeCommonFields;
+  if (getType(included) === 'array' && included.length > 0) {
+    let filtered = [];
+    for (var ci = 0; ci < commonFields.length; ci++) {
+      let keep = true;
+      for (var ii = 0; ii < included.length; ii++) {
+        var row = included[ii];
+        if (row && getType(row.fieldName) === 'string' &&
+            row.fieldName.trim() === commonFields[ci]) {
+          keep = false;
+          break;
+        }
+      }
+      if (keep) filtered.push(commonFields[ci]);
+    }
+    commonFields = filtered;
+  }
+
   let mapping = object => {
     if (getType(object) === 'array') {
       // Mirror AvoSchemaParser: recurse into each element, then dedup. This is
@@ -1415,6 +1436,153 @@ scenarios:
     assertThat(names.indexOf('value')).isEqualTo(-1);
     assertThat(names.indexOf('client_id')).isEqualTo(-1);
     assertThat(names.indexOf('page_hostname')).isEqualTo(-1);
+    assertThat(names.indexOf('custom_prop')).isNotEqualTo(-1);
+
+- name: Includes opted-in common fields in the schema
+  code: |-
+    const mockData = {
+      inspectorKey: "test-key",
+      environment: "prod",
+      includeCommonFields: [
+        { fieldName: 'user_id' },
+        { fieldName: 'currency' },
+        { fieldName: ' value ' }
+      ]
+    };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'purchase',
+        client_id: 'c1',
+        page_hostname: 'example.com',
+        user_id: 'user-1',
+        currency: 'USD',
+        value: 42
+      };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    const props = parsed[0].eventProperties;
+    let userIdProp = null;
+    let currencyProp = null;
+    let valueProp = null;
+    let clientIdProp = null;
+    for (let i = 0; i < props.length; i++) {
+      if (props[i].propertyName === 'user_id') userIdProp = props[i];
+      if (props[i].propertyName === 'currency') currencyProp = props[i];
+      if (props[i].propertyName === 'value') valueProp = props[i];
+      if (props[i].propertyName === 'client_id') clientIdProp = props[i];
+    }
+    assertThat(userIdProp).isNotEqualTo(null);
+    assertThat(userIdProp.propertyType).isEqualTo('string');
+    assertThat(currencyProp).isNotEqualTo(null);
+    assertThat(currencyProp.propertyType).isEqualTo('string');
+    // ' value ' row proves fieldName is trimmed before matching
+    assertThat(valueProp).isNotEqualTo(null);
+    assertThat(valueProp.propertyType).isEqualTo('int');
+    // common fields NOT listed stay excluded
+    assertThat(clientIdProp).isEqualTo(null);
+    // anonymity unaffected: user_id never becomes the stream/anonymous id
+    assertThat(parsed[0].anonymousId).isEqualTo('c1');
+    assertThat(parsed[0].streamId).isEqualTo('c1');
+
+- name: Opted-in common field also appears inside nested objects
+  code: |-
+    const mockData = {
+      inspectorKey: "test-key",
+      environment: "prod",
+      includeCommonFields: [ { fieldName: 'currency' } ]
+    };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'purchase',
+        client_id: 'c1',
+        page_hostname: 'example.com',
+        items: [ { currency: 'USD', price: 9 } ]
+      };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const props = JSON.parse(capturedTrackBody)[0].eventProperties;
+    let itemsProp = null;
+    for (let i = 0; i < props.length; i++) {
+      if (props[i].propertyName === 'items') itemsProp = props[i];
+    }
+    assertThat(itemsProp).isNotEqualTo(null);
+    // items.children[0] is the element schema (double-bracketed, see list-of-objects tests)
+    const elementEntries = itemsProp.children[0];
+    let currencyEntry = null;
+    let priceEntry = null;
+    for (let j = 0; j < elementEntries.length; j++) {
+      if (elementEntries[j].propertyName === 'currency') currencyEntry = elementEntries[j];
+      if (elementEntries[j].propertyName === 'price') priceEntry = elementEntries[j];
+    }
+    assertThat(currencyEntry).isNotEqualTo(null);
+    assertThat(currencyEntry.propertyType).isEqualTo('string');
+    assertThat(priceEntry).isNotEqualTo(null);
+
+- name: Unknown or empty include rows change nothing
+  code: |-
+    const mockData = {
+      inspectorKey: "test-key",
+      environment: "prod",
+      includeCommonFields: [
+        { fieldName: 'userid' },
+        { fieldName: '' },
+        { fieldName: '   ' },
+        { fieldName: 'not_a_common_field' }
+      ]
+    };
+
+    mock('getAllEventData', function() {
+      return {
+        event_name: 'purchase',
+        client_id: 'c1',
+        page_hostname: 'example.com',
+        user_id: 'user-1',
+        currency: 'USD',
+        custom_prop: 'hello'
+      };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const props = JSON.parse(capturedTrackBody)[0].eventProperties;
+    let names = [];
+    for (let i = 0; i < props.length; i++) { names.push(props[i].propertyName); }
+    assertThat(names.indexOf('user_id')).isEqualTo(-1);
+    assertThat(names.indexOf('currency')).isEqualTo(-1);
     assertThat(names.indexOf('custom_prop')).isNotEqualTo(-1);
 
 ___NOTES___
