@@ -58,6 +58,22 @@ ___TEMPLATE_PARAMETERS___
       }
     ],
     "simpleValueType": true
+  },
+  {
+    "type": "SIMPLE_TABLE",
+    "name": "includeCommonFields",
+    "displayName": "Common fields to include in Inspector schemas",
+    "help": "By default this tag excludes standard GTM/GA4 common fields (e.g. client_id, currency, user_id, value, page_location, user_data.email_address) from the event schema sent to Avo Inspector. Add a field name here to include it. Only property names and types are sent to Inspector — never values. Fields prefixed x-ga- or x-sst- are always excluded.",
+    "simpleTableColumns": [
+      {
+        "defaultValue": "",
+        "displayName": "Field name",
+        "name": "fieldName",
+        "type": "TEXT",
+        "isUnique": true
+      }
+    ],
+    "newRowButtonText": "Add field"
   }
 ]
 
