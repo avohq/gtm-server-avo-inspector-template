@@ -16,7 +16,7 @@ homepage: "https://www.avo.app"
 documentation: "https://www.avo.app/docs/data-design/start-using-inspector"
 versions:
   # Latest version
-  - sha: 0000000000000000000000000000000000000000  # set to the release commit SHA at publish time
+  - sha: e93efa7800f0dd4b636ded1ddfa3f738fc7bf677
     changeNotes: |2
       Fix: capture the structure of objects nested inside lists (list-of-objects) in the event schema. Array properties are now introspected element-by-element and deduplicated — children was previously always null — matching the Avo Inspector SDK's schema output.
   # Older versions
