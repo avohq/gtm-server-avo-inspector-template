@@ -16,9 +16,10 @@ homepage: "https://www.avo.app"
 documentation: "https://www.avo.app/docs/data-design/start-using-inspector"
 versions:
   # Latest version
-  - sha: c51e468f0b32e1c914f22eb0ed2f51c87afa46b6
+  - sha: b9e4fbfb955e65a1145698e4ce351a759d3111af
     changeNotes: |2
       Feature: configurable common-field exclusions. New "Common fields to include in Inspector schemas" tag parameter opts default-excluded fields (e.g. user_id, currency) back into the Inspector event schema. Defaults unchanged when the table is empty; only property names and types are ever sent. libVersion 2.1.0.
+      Fixed the brand thumbnail (previous embedded image was corrupted).
   # Older versions
   - sha: e93efa7800f0dd4b636ded1ddfa3f738fc7bf677
     changeNotes: |2
