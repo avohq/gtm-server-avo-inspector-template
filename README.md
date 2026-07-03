@@ -15,6 +15,22 @@ The template automatically resolves an anonymous ID from the event data to use a
 
 `user_id` is intentionally excluded — it is typically a known, authenticated identifier and would break anonymity. If none of the above are present, an empty string is used.
 
+## Excluded common fields
+
+The tag excludes standard GTM/GA4 common fields from the event schema sent to Avo Inspector, so monitoring focuses on your custom event properties. The default exclusion list:
+
+`client_id`, `currency`, `event_name`, `ip_override`, `language`, `page_encoding`, `page_hostname`, `page_location`, `page_path`, `page_referrer`, `page_title`, `screen_resolution`, `user_agent`, `user_data.email_address`, `user_data.phone_number`, `user_data.address.first_name`, `user_data.address.last_name`, `user_data.address.street`, `user_data.address.city`, `user_data.address.region`, `user_data.address.postal_code`, `user_data.address.country`, `user_id`, `value`, `viewport_size`, plus all `x-ga-*` and `x-sst-*` prefixed keys.
+
+### Including specific fields
+
+Use the **"Common fields to include in Inspector schemas"** table in the tag configuration to opt fields back in (e.g. `user_id`, `currency`):
+
+- Only the property name and type are sent to Inspector — never values.
+- Including `user_id` does not change anonymous-ID resolution (see above); it is never used as the stream ID.
+- `x-ga-*` / `x-sst-*` keys are always excluded and cannot be opted in.
+- Names must exactly match a default-excluded field (whitespace is trimmed); unknown names are ignored.
+- The setting applies at every nesting level — e.g. including `currency` also reveals a `currency` key inside `items[]` objects.
+
 ## Event Validation (dev/staging only)
 
 In development and staging environments, events are validated against the tracking plan spec fetched from the Avo API. The spec is fetched per request using the `/trackingPlan/eventSpec` endpoint.
