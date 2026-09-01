@@ -31,6 +31,34 @@ Use the **"Common fields to include in Inspector schemas"** table in the tag con
 - Names must exactly match a default-excluded field (whitespace is trimmed); unknown names are ignored.
 - The setting applies at every nesting level — e.g. including `currency` also reveals a `currency` key inside `items[]` objects.
 
+## Gateways
+
+Avo Inspector is moving to a multi-gate model: one Inspector API key per *gateway* (e.g. this server-side GTM container), rather than one Inspector source per destination. This tag has two optional parameters, **Output reference** and **Origin hint**, that let a gateway-scoped key tell observations apart.
+
+**Output reference** determines which checkpoint a tag instance observes:
+
+- Leave it empty to observe at the **gateway checkpoint** — after gateway-level transformations, before any individual output's own transformations.
+- Set it to a destination's reference from Avo (e.g. `meta-x7k2q`) to observe **that output's checkpoint** — after that output's transformations.
+
+To observe an output's checkpoint, fire this tag with the same trigger as the destination tag and add it to that destination's transformations. What this tag sends is the event as *this tag* sees it at that point — i.e. before the destination tag's own mapping runs, not the payload as it actually leaves the destination.
+
+Both fields are optional and independent: `outputReference` alone determines the checkpoint, `originHint` (below) can be set or omitted at either checkpoint.
+
+## Origin hint
+
+**Origin hint** is a value identifying which source produced the event, e.g. `{{Event Data - platform}}`. Use the same field consistently across every Avo tag in the container, then map each value to a source in Avo.
+
+- Values must be **low-cardinality** (e.g. `android`, `ios`, `web`) — never a user identifier, session ID, or anything else unique per user or per event.
+- The tag does not validate this at runtime; it only trims and stringifies the value you provide, so getting this right is on the tag configuration, not the code.
+
+> A customer's own event property literally named `outputReference` or `originHint` (with unrelated business meaning) is unaffected by this feature. It still appears in `eventProperties` exactly as before — the top-level `outputReference`/`originHint` fields described here come only from this tag's configuration, never from event data, and neither one overwrites or is affected by the other even though they share a key name.
+
+## What the 200 means
+
+An HTTP 200 response from Avo means the event was **accepted**, not necessarily that it was fully processed. A workspace's Inspector event cap can silently drop an accepted event without changing the response status code.
+
+In GTM Preview mode, this tag inspects the response body and logs a console warning when it indicates a drop — for example when the workspace's event limit has been exceeded — so this is visible while testing rather than a silent gap. This logging only runs in Preview mode; it does not change whether the tag reports success or failure to GTM (`gtmOnSuccess/gtmOnFailure` are driven solely by the HTTP status code, unchanged by this behavior).
+
 ## Event Validation (dev/staging only)
 
 In development and staging environments, events are validated against the tracking plan spec fetched from the Avo API. The spec is fetched per request using the `/trackingPlan/eventSpec` endpoint.
