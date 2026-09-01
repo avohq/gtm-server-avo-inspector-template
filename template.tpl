@@ -562,9 +562,6 @@ function logDropIfAny(responseBody) {
   if (parsed.success === false) {
     log('Avo Inspector: event accepted but dropped (workspace Inspector event limit exceeded)');
   } else if (parsed.ok === false) {
-    // TODO(AVO-3516 follow-up): remove this branch if `{ok:false,error:...}`
-    // is never observed on this v1 endpoint, once confirmed with the
-    // ingestion team.
     log('Avo Inspector: event rejected by Avo', parsed.error);
   }
 }
