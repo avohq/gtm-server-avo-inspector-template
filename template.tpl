@@ -512,6 +512,9 @@ function sendData(body) {
     timeout: 2000,
   }, postBody).then(function(result) {
     if (result.statusCode >= 200 && result.statusCode < 300) {
+      if (isPreview) {
+        logDropIfAny(result.body);
+      }
       data.gtmOnSuccess();
     } else {
       data.gtmOnFailure();
@@ -519,6 +522,42 @@ function sendData(body) {
   }).catch((error) => {
     data.gtmOnFailure();
   });
+}
+
+// Preview-mode only: a 2xx response can still mean the event was dropped
+// (workspace Inspector event-cap) or rejected. JSON.parse returns undefined
+// on invalid input in this sandbox rather than throwing, so guard it instead
+// of relying on try/catch.
+//
+// Response-shape contract (explicit, not equally-confirmed): `{"success":
+// false}` is the CONFIRMED drop shape on `/inspector/gtm/v1/track` (AVO-3467,
+// ingestion side, done). `{"ok": false, "error": ...}` is UNCONFIRMED on this
+// v1 endpoint — it may be a v2-only shape, or may never appear here at all.
+// AVO-3516 lists both as shapes to log defensively, so both branches ship,
+// but the `ok`/`error` branch is explicitly a best-effort/defensive check,
+// not a validated contract: Required Test 23 only proves this branch logs
+// correctly and doesn't crash if fed that shape, not that the shape occurs
+// in production. If it never appears, this branch is inert dead code that
+// costs nothing and can be deleted in a later cleanup once confirmed with
+// the ingestion team — tracked via the TODO comment below (Rev 3, Stage 2
+// Minor Issue 1) rather than existing only as prose in this spec, so a
+// future cleanup pass has something greppable to find.
+function logDropIfAny(responseBody) {
+  if (getType(responseBody) !== 'string' || responseBody === '') {
+    return;
+  }
+  var parsed = JSON.parse(responseBody);
+  if (getType(parsed) !== 'object') {
+    return;
+  }
+  if (parsed.success === false) {
+    log('Avo Inspector: event accepted but dropped (workspace Inspector event limit exceeded)');
+  } else if (parsed.ok === false) {
+    // TODO(AVO-3516 follow-up): remove this branch if `{ok:false,error:...}`
+    // is never observed on this v1 endpoint, once confirmed with the
+    // ingestion team.
+    log('Avo Inspector: event rejected by Avo', parsed.error);
+  }
 }
 
 function extractSchema(gtmEvent) {
