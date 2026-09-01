@@ -135,7 +135,7 @@ function generateBaseBody(gtmEvent) {
       gtmEvent.page_hostname != null ? gtmEvent.page_hostname : 'unnamed GTM server-side tag',
     env: data.environment,
     appVersion: 'unversioned GTM server-side tag',
-    libVersion: '2.1.0',
+    libVersion: '2.2.0',
     libPlatform: getClientName(),
     messageId: uniqueid(gtmEvent.event_name),
     trackingId: '',
@@ -154,7 +154,38 @@ function handleEvent(gtmEvent, streamId) {
   eventBody.eventProperties = extractSchema(gtmEvent);
   eventBody.streamId = streamId;
 
+  setHintField(eventBody, 'outputReference', data.outputReference);
+  setHintField(eventBody, 'originHint', data.originHint);
+
   return eventBody;
+}
+
+// --- Gateway coordinate fields (outputReference, originHint, ...) ---
+// Normalizes a tag-parameter value into a string safe to attach to the track
+// body, or '' when there is nothing sendable. Caller omits the key entirely
+// when the result is ''.
+function toHintString(value) {
+  var t = getType(value);
+  if (t === 'string') {
+    return value.trim();
+  } else if (t === 'number' || t === 'boolean') {
+    return '' + value;
+  }
+  // undefined, null, object, array -> nothing sendable; the server parser
+  // only decodes optional strings and silently drops other JSON types, so
+  // stringifying (or sending) anything else here would be misleading.
+  return '';
+}
+
+// Normalizes rawValue via toHintString and sets body[key] only when the
+// result is non-empty; omits the key entirely otherwise (never null/'').
+// Centralizes the "trim/stringify, then omit-if-empty" rule shared by both
+// hint fields so a future third field is one call, not one more block.
+function setHintField(body, key, rawValue) {
+  var value = toHintString(rawValue);
+  if (value !== '') {
+    body[key] = value;
+  }
 }
 
 function fetchAndValidate(gtmEvent, eventBody, streamId, callback) {
