@@ -559,10 +559,12 @@ function logDropIfAny(responseBody) {
   if (getType(parsed) !== 'object') {
     return;
   }
-  if (parsed.success === false) {
-    log('Avo Inspector: event accepted but dropped (workspace Inspector event limit exceeded)');
-  } else if (parsed.ok === false) {
-    log('Avo Inspector: event rejected by Avo', parsed.error);
+  if (parsed.success === false || parsed.ok === false) {
+    if (getType(parsed.error) === 'string' && parsed.error !== '') {
+      log('Avo Inspector: event accepted but not processed (workspace Inspector event limit exceeded or event rejected)', parsed.error);
+    } else {
+      log('Avo Inspector: event accepted but not processed (workspace Inspector event limit exceeded or event rejected)');
+    }
   }
 }
 
@@ -2175,7 +2177,7 @@ scenarios:
     assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
     assertThat(parsed[0].originHint).isEqualTo('android');
 
-- name: Preview mode logs exactly once when response body signals success false (confirmed drop shape)
+- name: Preview mode logs exactly once when response body signals success false
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
@@ -2206,7 +2208,8 @@ scenarios:
     runCode(mockData);
 
     assertThat(logCallCount).isEqualTo(1);
-    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event accepted but dropped (workspace Inspector event limit exceeded)');
+    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event accepted but not processed (workspace Inspector event limit exceeded or event rejected)');
+    assertThat(capturedLogArgs[1]).isEqualTo(undefined);
     assertApi('gtmOnSuccess').wasCalled();
     assertApi('gtmOnFailure').wasNotCalled();
 
@@ -2267,7 +2270,7 @@ scenarios:
     assertThat(logCallCount).isEqualTo(0);
     assertApi('gtmOnSuccess').wasCalled();
 
-- name: Preview mode logs the error value for the defensive ok false rejected shape
+- name: Preview mode logs the same message plus the error value when response body signals ok false
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
@@ -2294,7 +2297,7 @@ scenarios:
     runCode(mockData);
 
     assertThat(logCallCount).isEqualTo(1);
-    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event rejected by Avo');
+    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event accepted but not processed (workspace Inspector event limit exceeded or event rejected)');
     assertThat(capturedLogArgs[1]).isEqualTo('boom');
 
 - name: Preview mode does not throw or log for non-JSON, empty, or null-typed response bodies
