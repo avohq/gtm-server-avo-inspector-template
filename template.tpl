@@ -2113,6 +2113,233 @@ scenarios:
     assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
     assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
 
+- name: Non-2xx response calls gtmOnFailure and not gtmOnSuccess (regression guard)
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 500, body: '' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    assertApi('gtmOnFailure').wasCalled();
+    assertApi('gtmOnSuccess').wasNotCalled();
+
+- name: Dev/staging round trip preserves outputReference and originHint through fetchAndValidate
+  code: |-
+    const JSON = require('JSON');
+    const mockData = {
+      inspectorKey: "test-key",
+      environment: "dev",
+      outputReference: "meta-x7k2q",
+      originHint: "android"
+    };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'test-client-123' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
+        return { then: function(onResolve) {
+          onResolve({ statusCode: 200, body: JSON.stringify({ events: [] }) });
+          return { catch: function() {} };
+        } };
+      }
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
+    assertThat(parsed[0].originHint).isEqualTo('android');
+
+- name: Preview mode logs exactly once when response body signals success false (confirmed drop shape)
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    // Mechanism: closure-capture on logToConsole, mirroring this file's existing
+    // sendHttpRequest body-capture idiom. Used here (rather than
+    // assertApi('logToConsole')) because it lets us assert the exact call count
+    // and the exact captured message/args, not just that a call occurred.
+    let logCallCount = 0;
+    let capturedLogArgs = null;
+    mock('logToConsole', function(msg, arg) {
+      logCallCount++;
+      capturedLogArgs = [msg, arg];
+    });
+
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"success": false}' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    assertThat(logCallCount).isEqualTo(1);
+    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event accepted but dropped (workspace Inspector event limit exceeded)');
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+
+- name: Preview mode does not log when response body signals success true
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    let logCallCount = 0;
+    let capturedLogArgs = null;
+    mock('logToConsole', function(msg, arg) {
+      logCallCount++;
+      capturedLogArgs = [msg, arg];
+    });
+
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"success": true}' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    assertThat(logCallCount).isEqualTo(0);
+
+- name: Non-preview mode does not log on success false and still calls gtmOnSuccess
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let logCallCount = 0;
+    let capturedLogArgs = null;
+    mock('logToConsole', function(msg, arg) {
+      logCallCount++;
+      capturedLogArgs = [msg, arg];
+    });
+
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"success": false}' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    assertThat(logCallCount).isEqualTo(0);
+    assertApi('gtmOnSuccess').wasCalled();
+
+- name: Preview mode logs the error value for the defensive ok false rejected shape
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    let logCallCount = 0;
+    let capturedLogArgs = null;
+    mock('logToConsole', function(msg, arg) {
+      logCallCount++;
+      capturedLogArgs = [msg, arg];
+    });
+
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"ok": false, "error": "boom"}' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    assertThat(logCallCount).isEqualTo(1);
+    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event rejected by Avo');
+    assertThat(capturedLogArgs[1]).isEqualTo('boom');
+
+- name: Preview mode does not throw or log for non-JSON, empty, or null-typed response bodies
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    let logCallCount = 0;
+    let capturedLogArgs = null;
+    mock('logToConsole', function(msg, arg) {
+      logCallCount++;
+      capturedLogArgs = [msg, arg];
+    });
+
+    // Sub-check 1: empty body
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '' });
+        return { catch: function() {} };
+      } };
+    });
+    runCode(mockData);
+    assertThat(logCallCount).isEqualTo(0);
+
+    // Sub-check 2: non-JSON body
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: 'not json' });
+        return { catch: function() {} };
+      } };
+    });
+    runCode(mockData);
+    assertThat(logCallCount).isEqualTo(0);
+
+    // Sub-check 3: body 'null' -- valid JSON, but getType(JSON.parse('null')) is 'null', not
+    // 'object', per this file's getPropValueType/getType convention, so it must hit the same
+    // getType(parsed) !== 'object' guard as the other two sub-checks.
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: 'null' });
+        return { catch: function() {} };
+      } };
+    });
+    runCode(mockData);
+    assertThat(logCallCount).isEqualTo(0);
+
 ___NOTES___
 
 Created on 07/05/2023, 13:31:37
