@@ -21,6 +21,10 @@ versions:
       Feature: gateway support via outputReference and originHint. Two new optional tag parameters attach outputReference (which output's checkpoint this tag instance observes; leave empty to observe at the gateway checkpoint) and originHint (a low-cardinality hint identifying the event's source, never a user identifier) as top-level fields on the track body, alongside eventProperties. This lets a single gateway-scoped Inspector API key distinguish which output or source produced each observation. Existing tag instances with neither parameter set continue to send a byte-for-byte identical body except for the libVersion bump. libVersion 2.2.0.
       Preview mode: a 200 response no longer means the event was necessarily processed. When the response body indicates the event was accepted but dropped (workspace Inspector event limit exceeded) or rejected, a console warning is now logged in GTM Preview mode so this is visible during setup; gtmOnSuccess/gtmOnFailure behavior is unchanged.
   # Older versions
+  - sha: b9e4fbfb955e65a1145698e4ce351a759d3111af
+    changeNotes: |2
+      Feature: configurable common-field exclusions. New "Common fields to include in Inspector schemas" tag parameter opts default-excluded fields (e.g. user_id, currency) back into the Inspector event schema. Defaults unchanged when the table is empty; only property names and types are ever sent. libVersion 2.1.0.
+      Fixed the brand thumbnail (previous embedded image was corrupted).
   - sha: e93efa7800f0dd4b636ded1ddfa3f738fc7bf677
     changeNotes: |2
       Fix: capture the structure of objects nested inside lists (list-of-objects) in the event schema. Array properties are now introspected element-by-element and deduplicated — children was previously always null — matching the Avo Inspector SDK's schema output.
