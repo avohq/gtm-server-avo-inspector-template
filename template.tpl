@@ -543,10 +543,19 @@ function sendData(body) {
 // Minor Issue 1) rather than existing only as prose in this spec, so a
 // future cleanup pass has something greppable to find.
 function logDropIfAny(responseBody) {
-  if (getType(responseBody) !== 'string' || responseBody === '') {
+  if (getType(responseBody) !== 'string') {
     return;
   }
-  var parsed = JSON.parse(responseBody);
+  // Only ever hand JSON.parse a brace-delimited body. The template-editor test
+  // runner's JSON.parse throws on malformed input (the production sandbox is
+  // documented to return undefined instead), and sandboxed JS has no try/catch,
+  // so anything that is not at least shaped like a JSON object is ignored here.
+  var trimmed = responseBody.trim();
+  if (trimmed.length < 2 || trimmed.charAt(0) !== '{' ||
+      trimmed.charAt(trimmed.length - 1) !== '}') {
+    return;
+  }
+  var parsed = JSON.parse(trimmed);
   if (getType(parsed) !== 'object') {
     return;
   }
@@ -2328,12 +2337,22 @@ scenarios:
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
 
-    // Sub-check 3: body 'null' -- valid JSON, but getType(JSON.parse('null')) is 'null', not
-    // 'object', per this file's getPropValueType/getType convention, so it must hit the same
-    // getType(parsed) !== 'object' guard as the other two sub-checks.
+    // Sub-check 3: body 'null' -- valid JSON but not brace-delimited, so it never reaches
+    // JSON.parse (and even if it did, getType(null) is 'null', not 'object').
     mock('sendHttpRequest', function(url, options, body) {
       return { then: function(onResolve) {
         onResolve({ statusCode: 200, body: 'null' });
+        return { catch: function() {} };
+      } };
+    });
+    runCode(mockData);
+    assertThat(logCallCount).isEqualTo(0);
+
+    // Sub-check 4: JSON array body -- valid JSON, not an object; the brace guard rejects it
+    // before JSON.parse, so the success:false inside must not be logged.
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '[{"success": false}]' });
         return { catch: function() {} };
       } };
     });
