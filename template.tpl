@@ -76,6 +76,14 @@ ___TEMPLATE_PARAMETERS___
     "help": "Value identifying which source the event came from, e.g. {{Event Data - platform}}; use the same field in every Avo tag in the container and map each value to a source in Avo; low-cardinality values only, never a user identifier."
   },
   {
+    "type": "TEXT",
+    "name": "appVersion",
+    "displayName": "App version (optional)",
+    "simpleValueType": true,
+    "canBeEmptyString": true,
+    "help": "Version of the app the event came from, e.g. {{Event Data - app_version}}. When Origin hint is set, the event belongs to a separate source, so this value is sent as the app version (or null when empty) instead of the container-level default; without Origin hint, an empty value falls back to the default."
+  },
+  {
     "type": "SIMPLE_TABLE",
     "name": "includeCommonFields",
     "displayName": "Common fields to include in Inspector schemas",
@@ -156,6 +164,17 @@ function handleEvent(gtmEvent, streamId) {
 
   setHintField(eventBody, 'outputReference', data.outputReference);
   setHintField(eventBody, 'originHint', data.originHint);
+
+  // App version: with an originHint the event belongs to a separate source, so
+  // the container-level default from generateBaseBody never applies — send the
+  // provided version, or null when none is usable. Without an originHint a
+  // provided version overrides the default; otherwise the default stands.
+  var providedAppVersion = toHintString(data.appVersion);
+  if (eventBody.hasOwnProperty('originHint')) {
+    eventBody.appVersion = providedAppVersion !== '' ? providedAppVersion : null;
+  } else if (providedAppVersion !== '') {
+    eventBody.appVersion = providedAppVersion;
+  }
 
   return eventBody;
 }
@@ -2120,6 +2139,7 @@ scenarios:
     assertThat(parsed[0].libVersion).isEqualTo('2.2.0');
     assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
     assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
 
 - name: Non-2xx response calls gtmOnFailure and not gtmOnSuccess (regression guard)
   code: |-
@@ -2358,6 +2378,98 @@ scenarios:
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
+
+- name: originHint set with app version sends the provided app version
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android", appVersion: "3.1.4" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].originHint).isEqualTo('android');
+    assertThat(parsed[0].appVersion).isEqualTo('3.1.4');
+- name: originHint set without app version sends null app version instead of the container default
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].appVersion).isEqualTo(null);
+- name: originHint set with whitespace-only app version sends null app version
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android", appVersion: "   " };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].appVersion).isEqualTo(null);
+- name: app version without originHint overrides the container default
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod", appVersion: 42 };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].appVersion).isEqualTo('42');
+    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+
 
 ___NOTES___
 

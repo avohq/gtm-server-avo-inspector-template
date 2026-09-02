@@ -49,6 +49,7 @@ Both fields are optional and independent: `outputReference` alone determines the
 **Origin hint** is a value identifying which source produced the event, e.g. `{{Event Data - platform}}`. Use the same field consistently across every Avo tag in the container, then map each value to a source in Avo.
 
 - Values must be **low-cardinality** (e.g. `android`, `ios`, `web`) — never a user identifier, session ID, or anything else unique per user or per event.
+- When Origin hint is set, the optional **App version** parameter is sent as the event's app version (or `null` when empty) — the container-level default never applies to a source-scoped event. Without Origin hint, App version overrides the default when set and falls back to it when empty.
 - The tag does not validate this at runtime; it only trims and stringifies the value you provide, so getting this right is on the tag configuration, not the code.
 
 > A customer's own event property literally named `outputReference` or `originHint` (with unrelated business meaning) is unaffected by this feature. It still appears in `eventProperties` exactly as before — the top-level `outputReference`/`originHint` fields described here come only from this tag's configuration, never from event data, and neither one overwrites or is affected by the other even though they share a key name.
