@@ -566,43 +566,39 @@ function sendData(body) {
 //                            non-2xx straight to gtmOnFailure — but the same
 //                            ok:false shape is what the 200 exception case
 //                            carries, optionally with an "error" string.
-// Both false-shapes are logged, hence the two branches below. Everything that
-// happens after enqueueing — decoding the payload into an Inspector event, and
-// Inspector's sampling — runs in a background worker and is never visible in
-// this response, so a clean 200 is silence, not proof of processing.
+// Both false-shapes are logged, hence the two signals matched below. Everything
+// that happens after enqueueing — decoding the payload into an Inspector
+// event, and Inspector's sampling — runs in a background worker and is never
+// visible in this response, so a clean 200 is silence, not proof of processing.
 function logDropIfAny(responseBody) {
   if (getType(responseBody) !== 'string') {
     return;
   }
-  // Only ever hand JSON.parse a body that is plausibly a JSON object. The
-  // template-editor test runner's JSON.parse throws on malformed input (the
-  // production sandbox is documented to return undefined instead) and sandboxed
-  // JS has no try/catch, so the guard has to be strict enough that a
-  // brace-wrapped non-JSON body such as `{not-json}` is rejected too: after the
-  // opening brace the next character must start a key ('"') or close an empty
-  // object ('}'). The endpoint's bodies are compact JSON, so this costs nothing;
-  // at worst a pretty-printed body would be skipped, and a missed preview log is
-  // an acceptable trade for never throwing.
   var trimmed = responseBody.trim();
+  // Object shape only. This is not a claim that the body is valid JSON, it just
+  // keeps the contents of an array body from being read as a top-level signal.
   if (trimmed.length < 2 || trimmed.charAt(0) !== '{' ||
       trimmed.charAt(trimmed.length - 1) !== '}') {
     return;
   }
-  var secondChar = trimmed.charAt(1);
-  if (secondChar !== '"' && secondChar !== '}') {
+  // Recognize the two failure signals by substring instead of parsing. No
+  // character-level guard can make JSON.parse safe here: `{"ok":false,}` is
+  // object-shaped and still malformed, and the template-editor test runner's
+  // JSON.parse throws on malformed input (the production sandbox is documented
+  // to return undefined instead) with no try/catch available to sandboxed JS.
+  // Matching fixed substrings cannot throw for any input, and collapsing the
+  // whitespace first means a pretty-printed body is read correctly too.
+  var compact = trimmed.split(' ').join('')
+    .split('\n').join('')
+    .split('\r').join('')
+    .split('\t').join('');
+  if (compact.indexOf('"success":false') === -1 &&
+      compact.indexOf('"ok":false') === -1) {
     return;
   }
-  var parsed = JSON.parse(trimmed);
-  if (getType(parsed) !== 'object') {
-    return;
-  }
-  if (parsed.success === false || parsed.ok === false) {
-    if (getType(parsed.error) === 'string' && parsed.error !== '') {
-      log('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)', parsed.error);
-    } else {
-      log('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
-    }
-  }
+  // The body itself is the diagnostic: it carries the endpoint's optional
+  // "error" string when there is one, and costs nothing when there is not.
+  log('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)', trimmed);
 }
 
 function extractSchema(gtmEvent) {
@@ -2575,7 +2571,9 @@ scenarios:
 
     assertThat(logCallCount).isEqualTo(1);
     assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
-    assertThat(capturedLogArgs[1]).isEqualTo(undefined);
+    // The raw body is the second argument. It is the diagnostic, and it carries
+    // the endpoint's optional "error" string whenever the endpoint sends one.
+    assertThat(capturedLogArgs[1]).isEqualTo('{"success": false}');
     assertApi('gtmOnSuccess').wasCalled();
     assertApi('gtmOnFailure').wasNotCalled();
 
@@ -2636,7 +2634,7 @@ scenarios:
     assertThat(logCallCount).isEqualTo(0);
     assertApi('gtmOnSuccess').wasCalled();
 
-- name: Preview mode logs the same message plus the error value when response body signals ok false
+- name: Preview mode logs the same message plus the raw body when response body signals ok false
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
@@ -2664,7 +2662,7 @@ scenarios:
 
     assertThat(logCallCount).isEqualTo(1);
     assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
-    assertThat(capturedLogArgs[1]).isEqualTo('boom');
+    assertThat(capturedLogArgs[1]).isEqualTo('{"ok": false, "error": "boom"}');
 
 - name: Preview mode never throws or logs for empty, non-JSON, brace-wrapped-garbage, array, or non-string response bodies
   code: |-
@@ -2703,8 +2701,8 @@ scenarios:
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
 
-    // Sub-check 3: body 'null' -- valid JSON but not brace-delimited, so it never reaches
-    // JSON.parse (and even if it did, getType(null) is 'null', not 'object').
+    // Sub-check 3: body 'null' -- valid JSON but not object-shaped, so the shape check
+    // rejects it before the signal match.
     mock('sendHttpRequest', function(url, options, body) {
       return { then: function(onResolve) {
         onResolve({ statusCode: 200, body: 'null' });
@@ -2714,8 +2712,8 @@ scenarios:
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
 
-    // Sub-check 4: JSON array body -- valid JSON, not an object; the brace guard rejects it
-    // before JSON.parse, so the success:false inside must not be logged.
+    // Sub-check 4: JSON array body -- valid JSON, not an object; the shape check rejects
+    // it, so the success:false nested inside is not read as a top-level signal.
     mock('sendHttpRequest', function(url, options, body) {
       return { then: function(onResolve) {
         onResolve({ statusCode: 200, body: '[{"success": false}]' });
@@ -2725,10 +2723,9 @@ scenarios:
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
 
-    // Sub-check 5: brace-wrapped garbage. '{not-json}' starts with '{' and ends with
-    // '}', so the outer brace check alone would hand it to JSON.parse, which throws in
-    // the template-editor runner and would fail this scenario outright. The character
-    // after the opening brace must open a key ('"') or close an empty object ('}').
+    // Sub-check 5: brace-wrapped garbage. '{not-json}' is object-shaped, so it reaches
+    // the signal match, which finds neither '"ok":false' nor '"success":false' and
+    // returns without logging. Nothing parses the body, so nothing can throw.
     mock('sendHttpRequest', function(url, options, body) {
       return { then: function(onResolve) {
         onResolve({ statusCode: 200, body: '{not-json}' });
@@ -2750,9 +2747,8 @@ scenarios:
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
 
-    // Sub-check 7: the boundary of the tightened guard. '{}' is a legal empty JSON
-    // object whose second character is '}', so it must still reach JSON.parse and
-    // simply carry no signal -- proving the tightening did not over-reject.
+    // Sub-check 7: '{}' is object-shaped and carries no failure signal, so it must pass
+    // the shape check and then log nothing.
     mock('sendHttpRequest', function(url, options, body) {
       return { then: function(onResolve) {
         onResolve({ statusCode: 200, body: '{}' });
@@ -2761,6 +2757,53 @@ scenarios:
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
+
+- name: Preview mode logs without throwing for malformed or pretty-printed bodies carrying a failure signal
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    let logCallCount = 0;
+    let capturedLogArgs = null;
+    mock('logToConsole', function(msg, arg) {
+      logCallCount++;
+      capturedLogArgs = [msg, arg];
+    });
+
+    // Sub-check 1: a trailing comma makes this body object-shaped but invalid JSON.
+    // JSON.parse would throw on it in the template-editor runner and take down the
+    // accepted-response path before gtmOnSuccess; substring matching cannot throw.
+    // The ok:false signal is present, so it is reported rather than swallowed.
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"ok":false,}' });
+        return { catch: function() {} };
+      } };
+    });
+    runCode(mockData);
+    assertThat(logCallCount).isEqualTo(1);
+    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
+    assertThat(capturedLogArgs[1]).isEqualTo('{"ok":false,}');
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+
+    // Sub-check 2: a pretty-printed body. Whitespace is collapsed before matching, so
+    // the signal is still found -- the previous character-level guard skipped this.
+    logCallCount = 0;
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{\n  "success": false\n}' });
+        return { catch: function() {} };
+      } };
+    });
+    runCode(mockData);
+    assertThat(logCallCount).isEqualTo(1);
+    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
 
 - name: originHint set with app version sends the provided app version
   code: |-
