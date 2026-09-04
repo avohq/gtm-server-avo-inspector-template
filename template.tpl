@@ -589,11 +589,12 @@ function logDropIfAny(responseBody) {
   // Matching fixed substrings cannot throw for any input, and collapsing the
   // whitespace first means a pretty-printed body is read correctly too.
   //
-  // The collapse is a charAt loop rather than a split('/').join('') chain so
-  // that this path uses only string operations the published template already
-  // runs in this sandbox. Array.prototype.join appears nowhere else in this
-  // file, and an unavailable method here would throw in exactly the preview
-  // path the rest of this function exists to keep safe.
+  // The collapse is a charAt loop rather than a chain of split/join calls, one
+  // per whitespace character, so that this path uses only string operations the
+  // published template already runs in this sandbox. Array.prototype.join
+  // appears nowhere else in this file, and an unavailable method here would
+  // throw in exactly the preview path the rest of this function exists to keep
+  // safe.
   var compact = '';
   for (var wi = 0; wi < trimmed.length; wi++) {
     var ch = trimmed.charAt(wi);
@@ -605,8 +606,10 @@ function logDropIfAny(responseBody) {
       compact.indexOf('"ok":false') === -1) {
     return;
   }
-  // The body itself is the diagnostic: it carries the endpoint's optional
+  // The trimmed body is the diagnostic: it carries the endpoint's optional
   // "error" string when there is one, and costs nothing when there is not.
+  // Trimmed rather than raw so the logged value is exactly what the signal
+  // match above ran against; surrounding whitespace carries no diagnosis.
   log('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)', trimmed);
 }
 
@@ -2580,8 +2583,8 @@ scenarios:
 
     assertThat(logCallCount).isEqualTo(1);
     assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
-    // The raw body is the second argument. It is the diagnostic, and it carries
-    // the endpoint's optional "error" string whenever the endpoint sends one.
+    // The trimmed body is the second argument. It is the diagnostic, and it
+    // carries the endpoint's optional "error" string whenever one is sent.
     assertThat(capturedLogArgs[1]).isEqualTo('{"success": false}');
     assertApi('gtmOnSuccess').wasCalled();
     assertApi('gtmOnFailure').wasNotCalled();
@@ -2643,7 +2646,7 @@ scenarios:
     assertThat(logCallCount).isEqualTo(0);
     assertApi('gtmOnSuccess').wasCalled();
 
-- name: Preview mode logs the same message plus the raw body when response body signals ok false
+- name: Preview mode logs the same message plus the trimmed body when response body signals ok false
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
@@ -2767,7 +2770,7 @@ scenarios:
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
 
-- name: Preview mode logs without throwing for malformed or pretty-printed bodies carrying a failure signal
+- name: Preview mode logs without throwing for malformed, pretty-printed, or whitespace-padded bodies carrying a failure signal
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
@@ -2813,6 +2816,20 @@ scenarios:
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(1);
     assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
+
+    // Sub-check 3: surrounding whitespace. The logged second argument is the
+    // trimmed body, which is exactly the string the signal match ran against,
+    // so the log and the decision can never disagree about what was inspected.
+    logCallCount = 0;
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '  {"ok":false}  ' });
+        return { catch: function() {} };
+      } };
+    });
+    runCode(mockData);
+    assertThat(logCallCount).isEqualTo(1);
+    assertThat(capturedLogArgs[1]).isEqualTo('{"ok":false}');
 
 - name: originHint set with app version sends the provided app version
   code: |-
