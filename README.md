@@ -69,22 +69,51 @@ Because an Origin hint marks the event as belonging to a *different* source than
 
 > A customer's own event property literally named `outputReference`, `originHint` or `appVersion` (with unrelated business meaning) is unaffected by this feature. It still appears in `eventProperties` exactly as before — the top-level `outputReference`/`originHint`/`appVersion` fields described here come only from this tag's configuration, never from event data, and neither one overwrites or is affected by the other even though they share a key name.
 
+## Where events are sent
+
+The tag posts to Avo's unified Inspector ingest endpoint:
+
+```
+POST https://api.avo.app/inspector/v2/track
+```
+
+with these headers:
+
+| Header | Value |
+| --- | --- |
+| `api-key` | the Inspector key from the tag configuration |
+| `env` | `dev`, `staging` or `prod`, from the Environment parameter |
+| `X-Avo-Client` | `gtm-server` |
+| `content-type` | `application/json` |
+
+Every Avo Inspector sender — the SDKs and both GTM templates — now posts to this one endpoint and identifies itself with `X-Avo-Client`, so traffic can be attributed at the edge without decoding a body. `X-Avo-Client: gtm-server` is what marks a request as coming from this template.
+
+`api-key` and `env` are read from the headers rather than the body. The body still carries `apiKey` and `env` on every event so that all senders share one body shape; the endpoint ignores those copies.
+
+Three things changed when the tag moved here from the previous server-side GTM endpoint (`/inspector/gtm/v1/track`):
+
+- **Events are no longer sampled server-side.** The previous endpoint applied Inspector's own sampling to server-side GTM traffic, so an accepted event could still be discarded before it was stored, and stored counts were extrapolated from the surviving sample. This endpoint does not sample: every accepted event is stored, and counts are exact. (The `samplingRate: 1` field the tag puts on the body is unchanged — the tag has never sampled client-side.)
+- **Attribution changed.** Events used to be recorded with the tracking ID `GTM`, which the previous endpoint stamped on everything it handled. They are now recorded with `writeApiV2`, which this endpoint stamps on everything *it* handles, so the tracking ID no longer identifies server-side GTM. The `X-Avo-Client: gtm-server` header is what distinguishes this traffic instead.
+- **The 200 body changed shape.** See the next section.
+
+The tag makes this call from your GTM server container, server to server — never from a browser — so no CORS preflight is involved and browser-side constraints on this endpoint do not apply to it.
+
 ## What the 200 means
 
-An HTTP 200 from Avo means the event was **accepted and queued**, not that it was processed. Turning the payload into an Inspector event, and Inspector's own sampling, both happen later in a background worker, and neither outcome is reflected in the response this tag sees.
+An HTTP 200 from Avo means the event was **accepted and queued**, not that it was processed. Turning the payload into an Inspector event happens later in a background worker, after the response has already been sent, and its outcome is not reflected in the response this tag sees.
 
 | Response | What it means |
 | --- | --- |
-| `200 {"ok":true}` | Accepted and queued for processing. |
+| `200 {"samplingRate":1,"success":true}` | Accepted and queued for processing. The rate is a fixed `1` — this endpoint does not sample — and is on the body because downstream counting divides by it. |
 | `200 {"success":false}` | Accepted, then dropped because the workspace's Inspector event limit is exhausted. This is the only post-acceptance drop visible in a 200 body. |
-| `200 {"ok":false}` | An unexpected server-side error while handling the request. |
-| `400 {"ok":false,"error":"..."}` | Rejected before acceptance: a missing or invalid Inspector key or environment header, or a body the server could not parse. |
+| `200 {"ok":false}` | An unexpected server-side error while handling the request. The API's error handler answers without setting a status, so it arrives as a 2xx. |
+| `400 {"ok":false,"error":"..."}` | Rejected before acceptance: a missing or invalid Inspector key or environment header, an Inspector key the API does not recognize, or a body it could not parse. |
 
 Only the first three reach the tag as a success — any non-2xx (including the 400 row) calls `gtmOnFailure`.
 
 In GTM Preview mode, the tag inspects the body of a 2xx response and logs a console warning for the two `false` shapes, so an event-limit drop or a server error is visible while you are testing rather than looking like a clean success. The warning prints the response body as its second argument, trimmed of surrounding whitespace, rather than just an error message, so whatever else the endpoint said is visible too — it is Avo's own API response and carries no event data. This logging only runs in Preview mode; it does not change whether the tag reports success or failure to GTM (`gtmOnSuccess`/`gtmOnFailure` are driven solely by the HTTP status code, unchanged by this behavior).
 
-A 200 therefore cannot tell you that an event was *processed*: an event that later fails to decode, or that Inspector's sampling discards, is indistinguishable from one that made it all the way through.
+A 200 therefore cannot tell you that an event was *processed*: an event that later fails to decode in the background worker is indistinguishable from one that made it all the way through. What a 200 does now rule out is a sampling drop — there is no longer one.
 
 ## Event Validation (dev/staging only)
 

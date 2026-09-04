@@ -524,15 +524,31 @@ function toISOString(timestampMs) {
 }
 
 function sendData(body) {
-  const endpoint = 'https://api.avo.app/inspector/gtm/v1/track';
+  // The unified Inspector ingest endpoint. Every Avo sender — SDKs and both GTM
+  // templates — posts here and identifies itself with X-Avo-Client, so traffic
+  // can be attributed at the edge without decoding a body.
+  //
+  // v2 reads the Inspector key and the environment from the headers below, not
+  // from the body. generateBaseBody still puts apiKey/env on every event: that
+  // keeps one body shape across every sender and costs nothing.
+  const endpoint = 'https://api.avo.app/inspector/v2/track';
   const postBody = JSON.stringify(body);
 
   sendHttpRequest(endpoint, {
     headers: {
       'accept': 'application/json',
+      // application/json, deliberately: it is the content type v2 handles by
+      // reusing the body it has already parsed. text/plain takes a different
+      // server-side path and is not what this endpoint expects from a
+      // server-to-server sender.
       'content-type': 'application/json',
       'api-key': data.inspectorKey,
       'env': data.environment,
+      // Which sender this is. Header names are case-insensitive on the wire;
+      // this is the casing every other Avo client sends, and the API matches it
+      // lowercased. It identifies the traffic at the edge — the endpoint's own
+      // handling of the request does not depend on it.
+      'X-Avo-Client': 'gtm-server',
     },
     method: 'POST',
     timeout: 2000,
@@ -553,23 +569,30 @@ function sendData(body) {
 // Preview-mode only: a 2xx response does not mean the event was processed, so
 // inspect the body for the shapes that say otherwise.
 //
-// Response shapes on /inspector/gtm/v1/track:
-//   200 {"ok": true}         accepted and enqueued.
+// Response shapes on /inspector/v2/track:
+//   200 {"samplingRate":1,"success":true}  accepted and enqueued. v2 pins the
+//                            rate to 1.0 and does not sample, so the rate is a
+//                            constant rather than a decision; it is on the body
+//                            because downstream counting divides by it.
 //   200 {"success": false}   accepted, then dropped because the workspace's
-//                            Inspector event limit is exhausted. This is the
-//                            only post-acceptance drop a 200 body ever shows.
-//   200 {"ok": false}        an unexpected server-side exception (no explicit
-//                            status was set), so it arrives as a 2xx.
-//   400 {"ok": false, "error": "..."}  rejected before acceptance: missing or
-//                            invalid api-key/env header, or an unparsable body.
-//                            A 400 never reaches here — sendData routes any
-//                            non-2xx straight to gtmOnFailure — but the same
+//                            Inspector event limit is exhausted. This is still
+//                            the only post-acceptance drop a 200 body ever
+//                            shows.
+//   200 {"ok": false}        an unexpected server-side exception. The API's
+//                            error handler answers without setting a status,
+//                            so it arrives as a 2xx.
+//   400 {"ok": false, "error": "..."}  rejected before acceptance: a missing or
+//                            invalid api-key or env header, an Inspector key
+//                            the API does not recognize, or a body it could not
+//                            parse. A 400 never reaches here — sendData routes
+//                            any non-2xx straight to gtmOnFailure — but the same
 //                            ok:false shape is what the 200 exception case
 //                            carries, optionally with an "error" string.
-// Both false-shapes are logged, hence the two signals matched below. Everything
-// that happens after enqueueing — decoding the payload into an Inspector
-// event, and Inspector's sampling — runs in a background worker and is never
-// visible in this response, so a clean 200 is silence, not proof of processing.
+// Both false-shapes are logged, hence the two signals matched below. The success
+// body carries "success":true, which the "success":false substring cannot match,
+// so the accepted case stays silent. Decoding the payload into an Inspector
+// event still happens in a background worker after this response is sent and is
+// never visible in it, so a clean 200 is silence, not proof of processing.
 function logDropIfAny(responseBody) {
   if (getType(responseBody) !== 'string') {
     return;
@@ -592,9 +615,9 @@ function logDropIfAny(responseBody) {
   // The collapse is a charAt loop rather than a chain of split/join calls, one
   // per whitespace character, so that this path uses only string operations the
   // published template already runs in this sandbox. Array.prototype.join
-  // appears nowhere else in this file, and an unavailable method here would
-  // throw in exactly the preview path the rest of this function exists to keep
-  // safe.
+  // appears nowhere else in this sandboxed JS block, and an unavailable method
+  // here would throw in exactly the preview path the rest of this function
+  // exists to keep safe.
   var compact = '';
   for (var wi = 0; wi < trimmed.length; wi++) {
     var ch = trimmed.charAt(wi);
@@ -950,7 +973,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
+      if (url.indexOf('/inspector/v2/track') !== -1) {
         capturedTrackBody = body;
       }
       return { then: function(onResolve) {
@@ -991,7 +1014,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
+      if (url.indexOf('/inspector/v2/track') !== -1) {
         capturedTrackBody = body;
       }
       return { then: function(onResolve) {
@@ -1033,7 +1056,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
+      if (url.indexOf('/inspector/v2/track') !== -1) {
         capturedTrackBody = body;
       }
       return { then: function(onResolve) {
@@ -1076,7 +1099,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
+      if (url.indexOf('/inspector/v2/track') !== -1) {
         capturedTrackBody = body;
       }
       return { then: function(onResolve) {
@@ -1123,7 +1146,7 @@ scenarios:
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
         specFetchCalled = true;
       }
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
+      if (url.indexOf('/inspector/v2/track') !== -1) {
         trackCalled = true;
       }
       return { then: function(onResolve) {
@@ -1206,7 +1229,7 @@ scenarios:
           return { catch: function() {} };
         } };
       }
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
+      if (url.indexOf('/inspector/v2/track') !== -1) {
         capturedTrackBody = body;
       }
       return { then: function(onResolve) {
@@ -1275,7 +1298,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) {
+      if (url.indexOf('/inspector/v2/track') !== -1) {
         capturedTrackBody = body;
       }
       return { then: function(onResolve) {
@@ -1360,7 +1383,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1398,7 +1421,7 @@ scenarios:
         // reject: the .then success handler is skipped, .catch fires
         return { then: function() { return { catch: function(onReject) { onReject({ message: 'boom' }); } }; } };
       }
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { trackCalled = true; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { trackCalled = true; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1424,7 +1447,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1474,7 +1497,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1532,7 +1555,7 @@ scenarios:
           return { catch: function() {} };
         } };
       }
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1572,7 +1595,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1617,7 +1640,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1671,7 +1694,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1725,7 +1748,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1752,7 +1775,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1776,7 +1799,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1800,7 +1823,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1824,7 +1847,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1848,7 +1871,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1872,7 +1895,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1896,7 +1919,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1920,7 +1943,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1944,7 +1967,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1968,7 +1991,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -1992,7 +2015,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2016,7 +2039,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2040,7 +2063,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2063,7 +2086,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2087,7 +2110,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2113,7 +2136,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2138,7 +2161,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2163,7 +2186,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2187,7 +2210,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2210,7 +2233,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2234,7 +2257,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2258,7 +2281,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2284,7 +2307,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2314,7 +2337,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2346,7 +2369,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2377,14 +2400,14 @@ scenarios:
 
     let capturedTrackBodyA = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBodyA = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBodyA = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
     runCode({ inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q" });
 
     let capturedTrackBodyB = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBodyB = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBodyB = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
     runCode({ inspectorKey: "test-key", environment: "prod", outputReference: "ga4-9v3mp" });
@@ -2414,14 +2437,14 @@ scenarios:
 
     let capturedTrackBodyA = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBodyA = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBodyA = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
     runCode({ inspectorKey: "test-key", environment: "prod", originHint: "ios" });
 
     let capturedTrackBodyB = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBodyB = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBodyB = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
     runCode({ inspectorKey: "test-key", environment: "prod", originHint: "android" });
@@ -2455,7 +2478,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2540,7 +2563,7 @@ scenarios:
           return { catch: function() {} };
         } };
       }
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2589,7 +2612,7 @@ scenarios:
     assertApi('gtmOnSuccess').wasCalled();
     assertApi('gtmOnFailure').wasNotCalled();
 
-- name: Preview mode does not log when response body signals success true
+- name: Preview mode does not log for the v2 success body
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
@@ -2606,16 +2629,100 @@ scenarios:
       capturedLogArgs = [msg, arg];
     });
 
+    // Sub-check 1: the body /inspector/v2/track actually returns on acceptance.
+    // It contains "success":true, and the drop signal matched in logDropIfAny is
+    // "success":false, so the accepted case must stay silent.
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
+        return { catch: function() {} };
+      } };
+    });
+    runCode(mockData);
+    assertThat(logCallCount).isEqualTo(0);
+
+    // Sub-check 2: the same signal spelled with a space, which the whitespace
+    // collapse turns into the compact form before matching.
     mock('sendHttpRequest', function(url, options, body) {
       return { then: function(onResolve) {
         onResolve({ statusCode: 200, body: '{"success": true}' });
         return { catch: function() {} };
       } };
     });
+    runCode(mockData);
+    assertThat(logCallCount).isEqualTo(0);
+
+- name: Posts to the unified v2 endpoint with the X-Avo-Client identification header
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedUrl = null;
+    let capturedMethod = null;
+    let capturedHeaders = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      capturedUrl = url;
+      capturedMethod = options.method;
+      capturedHeaders = options.headers;
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
+        return { catch: function() {} };
+      } };
+    });
 
     runCode(mockData);
 
-    assertThat(logCallCount).isEqualTo(0);
+    // The unified endpoint every Avo sender posts to.
+    assertThat(capturedUrl).isEqualTo('https://api.avo.app/inspector/v2/track');
+    assertThat(capturedMethod).isEqualTo('POST');
+    // v2 takes the key and the environment from the headers, not from the body.
+    assertThat(capturedHeaders['api-key']).isEqualTo('test-key');
+    assertThat(capturedHeaders['env']).isEqualTo('prod');
+    // How server-side GTM traffic is told apart at the edge.
+    assertThat(capturedHeaders['X-Avo-Client']).isEqualTo('gtm-server');
+    // Keeps v2 on the branch that reuses its already-parsed body.
+    assertThat(capturedHeaders['content-type']).isEqualTo('application/json');
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+
+- name: The body still carries apiKey and env even though v2 reads them from headers
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "staging" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
+        return { then: function(onResolve) {
+          onResolve({ statusCode: 200, body: JSON.stringify({ events: [] }) });
+          return { catch: function() {} };
+        } };
+      }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    // v2 ignores these two body fields in favour of the headers, but they stay
+    // on the body so every Avo sender keeps one body shape.
+    const parsed = JSON.parse(capturedTrackBody)[0];
+    assertThat(parsed.apiKey).isEqualTo('test-key');
+    assertThat(parsed.env).isEqualTo('staging');
 
 - name: Non-preview mode does not log on success false and still calls gtmOnSuccess
   code: |-
@@ -2844,7 +2951,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2868,7 +2975,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2898,7 +3005,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2922,7 +3029,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2947,7 +3054,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2974,7 +3081,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -2999,7 +3106,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -3025,7 +3132,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -3052,7 +3159,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
@@ -3077,7 +3184,7 @@ scenarios:
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
       return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
     });
 
