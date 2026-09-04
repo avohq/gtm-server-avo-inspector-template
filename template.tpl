@@ -588,10 +588,19 @@ function logDropIfAny(responseBody) {
   // to return undefined instead) with no try/catch available to sandboxed JS.
   // Matching fixed substrings cannot throw for any input, and collapsing the
   // whitespace first means a pretty-printed body is read correctly too.
-  var compact = trimmed.split(' ').join('')
-    .split('\n').join('')
-    .split('\r').join('')
-    .split('\t').join('');
+  //
+  // The collapse is a charAt loop rather than a split('/').join('') chain so
+  // that this path uses only string operations the published template already
+  // runs in this sandbox. Array.prototype.join appears nowhere else in this
+  // file, and an unavailable method here would throw in exactly the preview
+  // path the rest of this function exists to keep safe.
+  var compact = '';
+  for (var wi = 0; wi < trimmed.length; wi++) {
+    var ch = trimmed.charAt(wi);
+    if (ch !== ' ' && ch !== '\n' && ch !== '\r' && ch !== '\t') {
+      compact = compact + ch;
+    }
+  }
   if (compact.indexOf('"success":false') === -1 &&
       compact.indexOf('"ok":false') === -1) {
     return;
