@@ -82,7 +82,7 @@ An HTTP 200 from Avo means the event was **accepted and queued**, not that it wa
 
 Only the first three reach the tag as a success — any non-2xx (including the 400 row) calls `gtmOnFailure`.
 
-In GTM Preview mode, the tag inspects the body of a 2xx response and logs a console warning for the two `false` shapes, so an event-limit drop or a server error is visible while you are testing rather than looking like a clean success. This logging only runs in Preview mode; it does not change whether the tag reports success or failure to GTM (`gtmOnSuccess`/`gtmOnFailure` are driven solely by the HTTP status code, unchanged by this behavior).
+In GTM Preview mode, the tag inspects the body of a 2xx response and logs a console warning for the two `false` shapes, so an event-limit drop or a server error is visible while you are testing rather than looking like a clean success. The warning prints the whole response body as its second argument, not just an error message, so whatever else the endpoint said is visible too — it is Avo's own API response and carries no event data. This logging only runs in Preview mode; it does not change whether the tag reports success or failure to GTM (`gtmOnSuccess`/`gtmOnFailure` are driven solely by the HTTP status code, unchanged by this behavior).
 
 A 200 therefore cannot tell you that an event was *processed*: an event that later fails to decode, or that Inspector's sampling discards, is indistinguishable from one that made it all the way through.
 
