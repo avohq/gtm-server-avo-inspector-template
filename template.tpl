@@ -22,7 +22,7 @@ ___INFO___
     "displayName": "",
     "thumbnail": "data:image/png;base64,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"
   },
-  "description": "Sends event metadata to Avo Inspector for tracking health monitoring. Resolves anonymous ID from event data as stream ID. Validates events against the tracking plan in dev/staging environments. Common GTM/GA4 fields are excluded from schemas by default and can be opted back in via tag configuration. Supports gateway-scoped Inspector keys via optional output reference and origin hint parameters.",
+  "description": "Sends event metadata to Avo Inspector for tracking health monitoring. Resolves anonymous ID from event data as stream ID. Validates events against the tracking plan in dev/staging environments. Common GTM/GA4 fields are excluded from schemas by default and can be opted back in via tag configuration. Supports gateway-scoped Inspector keys via optional output reference, origin hint and app version parameters.",
   "containerContexts": [
     "SERVER"
   ]
@@ -169,8 +169,15 @@ function handleEvent(gtmEvent, streamId) {
   // the container-level default from generateBaseBody never applies — send the
   // provided version, or null when none is usable. Without an originHint a
   // provided version overrides the default; otherwise the default stands.
+  //
+  // setHintField only ever sets originHint to a non-empty string, so testing the
+  // value's type is exactly equivalent to testing for the key's presence, and
+  // says directly what this branch depends on: that a source-scoped hint was
+  // actually written. (Object.prototype.hasOwnProperty does work in this
+  // sandbox — the helpers below use it — so this is a readability choice, not a
+  // compatibility one.)
   var providedAppVersion = toHintString(data.appVersion);
-  if (eventBody.hasOwnProperty('originHint')) {
+  if (getType(eventBody.originHint) === 'string') {
     eventBody.appVersion = providedAppVersion !== '' ? providedAppVersion : null;
   } else if (providedAppVersion !== '') {
     eventBody.appVersion = providedAppVersion;
@@ -543,35 +550,46 @@ function sendData(body) {
   });
 }
 
-// Preview-mode only: a 2xx response can still mean the event was dropped
-// (workspace Inspector event-cap) or rejected. JSON.parse returns undefined
-// on invalid input in this sandbox rather than throwing, so guard it instead
-// of relying on try/catch.
+// Preview-mode only: a 2xx response does not mean the event was processed, so
+// inspect the body for the shapes that say otherwise.
 //
-// Response-shape contract (explicit, not equally-confirmed): `{"success":
-// false}` is the CONFIRMED drop shape on `/inspector/gtm/v1/track` (AVO-3467,
-// ingestion side, done). `{"ok": false, "error": ...}` is UNCONFIRMED on this
-// v1 endpoint — it may be a v2-only shape, or may never appear here at all.
-// AVO-3516 lists both as shapes to log defensively, so both branches ship,
-// but the `ok`/`error` branch is explicitly a best-effort/defensive check,
-// not a validated contract: Required Test 23 only proves this branch logs
-// correctly and doesn't crash if fed that shape, not that the shape occurs
-// in production. If it never appears, this branch is inert dead code that
-// costs nothing and can be deleted in a later cleanup once confirmed with
-// the ingestion team — tracked via the TODO comment below (Rev 3, Stage 2
-// Minor Issue 1) rather than existing only as prose in this spec, so a
-// future cleanup pass has something greppable to find.
+// Response shapes on /inspector/gtm/v1/track:
+//   200 {"ok": true}         accepted and enqueued.
+//   200 {"success": false}   accepted, then dropped because the workspace's
+//                            Inspector event limit is exhausted. This is the
+//                            only post-acceptance drop a 200 body ever shows.
+//   200 {"ok": false}        an unexpected server-side exception (no explicit
+//                            status was set), so it arrives as a 2xx.
+//   400 {"ok": false, "error": "..."}  rejected before acceptance: missing or
+//                            invalid api-key/env header, or an unparsable body.
+//                            A 400 never reaches here — sendData routes any
+//                            non-2xx straight to gtmOnFailure — but the same
+//                            ok:false shape is what the 200 exception case
+//                            carries, optionally with an "error" string.
+// Both false-shapes are logged, hence the two branches below. Everything that
+// happens after enqueueing — decoding the payload into an Inspector event, and
+// Inspector's sampling — runs in a background worker and is never visible in
+// this response, so a clean 200 is silence, not proof of processing.
 function logDropIfAny(responseBody) {
   if (getType(responseBody) !== 'string') {
     return;
   }
-  // Only ever hand JSON.parse a brace-delimited body. The template-editor test
-  // runner's JSON.parse throws on malformed input (the production sandbox is
-  // documented to return undefined instead), and sandboxed JS has no try/catch,
-  // so anything that is not at least shaped like a JSON object is ignored here.
+  // Only ever hand JSON.parse a body that is plausibly a JSON object. The
+  // template-editor test runner's JSON.parse throws on malformed input (the
+  // production sandbox is documented to return undefined instead) and sandboxed
+  // JS has no try/catch, so the guard has to be strict enough that a
+  // brace-wrapped non-JSON body such as `{not-json}` is rejected too: after the
+  // opening brace the next character must start a key ('"') or close an empty
+  // object ('}'). The endpoint's bodies are compact JSON, so this costs nothing;
+  // at worst a pretty-printed body would be skipped, and a missed preview log is
+  // an acceptable trade for never throwing.
   var trimmed = responseBody.trim();
   if (trimmed.length < 2 || trimmed.charAt(0) !== '{' ||
       trimmed.charAt(trimmed.length - 1) !== '}') {
+    return;
+  }
+  var secondChar = trimmed.charAt(1);
+  if (secondChar !== '"' && secondChar !== '}') {
     return;
   }
   var parsed = JSON.parse(trimmed);
@@ -580,9 +598,9 @@ function logDropIfAny(responseBody) {
   }
   if (parsed.success === false || parsed.ok === false) {
     if (getType(parsed.error) === 'string' && parsed.error !== '') {
-      log('Avo Inspector: event accepted but not processed (workspace Inspector event limit exceeded or event rejected)', parsed.error);
+      log('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)', parsed.error);
     } else {
-      log('Avo Inspector: event accepted but not processed (workspace Inspector event limit exceeded or event rejected)');
+      log('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
     }
   }
 }
@@ -1880,6 +1898,78 @@ scenarios:
     const parsed = JSON.parse(capturedTrackBody);
     assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
 
+- name: outputReference as a padded string is trimmed
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.outputReference = '  meta-x7k2q  ';
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
+
+- name: outputReference as a number is stringified
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.outputReference = 42;
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].outputReference).isEqualTo('42');
+
+- name: outputReference as a boolean is stringified
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.outputReference = false;
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].outputReference).isEqualTo('false');
+
 - name: originHint as a plain string is trimmed and sent
   code: |-
     const JSON = require('JSON');
@@ -1956,6 +2046,130 @@ scenarios:
   code: |-
     const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+
+- name: originHint null omits the key
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.originHint = null;
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+    // originHint absent means the app-version rule falls back to the container default.
+    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
+
+- name: originHint empty string omits the key
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.originHint = '';
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
+
+- name: originHint whitespace-only omits the key
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.originHint = '   ';
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
+
+- name: originHint as an empty object omits the key
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.originHint = {};
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+
+- name: originHint as an empty array omits the key
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.originHint = [];
 
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1' };
@@ -2079,7 +2293,108 @@ scenarios:
     assertThat(outputReferenceProp.propertyType).isEqualTo('int');
     assertThat(parsed[0].outputReference).isEqualTo('meta-config-value');
 
-- name: Two tag instances differing only in originHint produce identical eventProperties
+- name: Event data property literally named originHint coexists with the tag-config originHint
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1', originHint: 'a business value of our own' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    const props = parsed[0].eventProperties;
+    let originHintProp = null;
+    for (let i = 0; i < props.length; i++) {
+      if (props[i].propertyName === 'originHint') originHintProp = props[i];
+    }
+    // The customer's own property survives untouched in the schema...
+    assertThat(originHintProp).isNotEqualTo(null);
+    assertThat(originHintProp.propertyType).isEqualTo('string');
+    // ...and the top-level field still comes only from the tag configuration.
+    assertThat(parsed[0].originHint).isEqualTo('android');
+
+- name: Event data property literally named appVersion coexists with the tag-config appVersion
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod", appVersion: "3.1.4" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1', appVersion: 77 };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    const props = parsed[0].eventProperties;
+    let appVersionProp = null;
+    for (let i = 0; i < props.length; i++) {
+      if (props[i].propertyName === 'appVersion') appVersionProp = props[i];
+    }
+    // The event-data property keeps its own name and type in the schema...
+    assertThat(appVersionProp).isNotEqualTo(null);
+    assertThat(appVersionProp.propertyType).isEqualTo('int');
+    // ...while the body's appVersion comes only from the tag parameter.
+    assertThat(parsed[0].appVersion).isEqualTo('3.1.4');
+
+- name: Two tag instances differing only in outputReference each carry their own outputReference
+  code: |-
+    const JSON = require('JSON');
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1', item_name: 'Test Product', price: 9.99 };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBodyA = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBodyA = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+    runCode({ inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q" });
+
+    let capturedTrackBodyB = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBodyB = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+    runCode({ inspectorKey: "test-key", environment: "prod", outputReference: "ga4-9v3mp" });
+
+    assertThat(capturedTrackBodyA).isNotEqualTo(null);
+    assertThat(capturedTrackBodyB).isNotEqualTo(null);
+    const bodyA = JSON.parse(capturedTrackBodyA)[0];
+    const bodyB = JSON.parse(capturedTrackBodyB)[0];
+    // The primary gateway use case: one key, two instances on the same event,
+    // each observing a different output. Each body must carry its own value.
+    assertThat(bodyA.outputReference).isEqualTo('meta-x7k2q');
+    assertThat(bodyB.outputReference).isEqualTo('ga4-9v3mp');
+    assertThat(bodyA.hasOwnProperty('originHint')).isEqualTo(false);
+    assertThat(bodyB.hasOwnProperty('originHint')).isEqualTo(false);
+    // ...and the observed schema is identical, since only the coordinate differs.
+    assertThat(JSON.stringify(bodyA.eventProperties)).isEqualTo(JSON.stringify(bodyB.eventProperties));
+
+- name: Two tag instances differing only in originHint each carry their own originHint
   code: |-
     const JSON = require('JSON');
 
@@ -2105,9 +2420,19 @@ scenarios:
 
     assertThat(capturedTrackBodyA).isNotEqualTo(null);
     assertThat(capturedTrackBodyB).isNotEqualTo(null);
-    const propsA = JSON.parse(capturedTrackBodyA)[0].eventProperties;
-    const propsB = JSON.parse(capturedTrackBodyB)[0].eventProperties;
-    assertThat(JSON.stringify(propsA)).isEqualTo(JSON.stringify(propsB));
+    const bodyA = JSON.parse(capturedTrackBodyA)[0];
+    const bodyB = JSON.parse(capturedTrackBodyB)[0];
+    // Assert each body's own hint first: comparing only eventProperties would
+    // still pass if both instances had somehow ended up with the same hint.
+    assertThat(bodyA.originHint).isEqualTo('ios');
+    assertThat(bodyB.originHint).isEqualTo('android');
+    assertThat(bodyA.hasOwnProperty('outputReference')).isEqualTo(false);
+    assertThat(bodyB.hasOwnProperty('outputReference')).isEqualTo(false);
+    // Both are source-scoped with no app version supplied, so both report null.
+    assertThat(bodyA.appVersion).isEqualTo(null);
+    assertThat(bodyB.appVersion).isEqualTo(null);
+    // Only the coordinate differs, so the observed schema is identical.
+    assertThat(JSON.stringify(bodyA.eventProperties)).isEqualTo(JSON.stringify(bodyB.eventProperties));
 
 - name: Backward compatibility - neither hint param set leaves the body unchanged except libVersion
   code: |-
@@ -2140,6 +2465,27 @@ scenarios:
     assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
     assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
     assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
+
+    // Exact key set of the body. The per-field assertions above cannot catch a
+    // brand-new key silently appearing (or an old one disappearing), which is
+    // precisely what "byte-for-byte identical except libVersion" has to mean.
+    const body = parsed[0];
+    let keys = [];
+    for (let key in body) {
+      if (body.hasOwnProperty(key)) { keys.push(key); }
+    }
+    // Insertion sort rather than Array.prototype.sort, so the assertion leans on
+    // nothing beyond the array primitives this sandbox certainly provides.
+    for (let i = 1; i < keys.length; i++) {
+      const current = keys[i];
+      let j = i - 1;
+      while (j >= 0 && keys[j] > current) {
+        keys[j + 1] = keys[j];
+        j = j - 1;
+      }
+      keys[j + 1] = current;
+    }
+    assertThat(keys.join(',')).isEqualTo('anonymousId,apiKey,appName,appVersion,avoFunction,createdAt,env,eventName,eventProperties,libPlatform,libVersion,messageId,samplingRate,sessionId,streamId,trackingId,type');
 
 - name: Non-2xx response calls gtmOnFailure and not gtmOnSuccess (regression guard)
   code: |-
@@ -2228,7 +2574,7 @@ scenarios:
     runCode(mockData);
 
     assertThat(logCallCount).isEqualTo(1);
-    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event accepted but not processed (workspace Inspector event limit exceeded or event rejected)');
+    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
     assertThat(capturedLogArgs[1]).isEqualTo(undefined);
     assertApi('gtmOnSuccess').wasCalled();
     assertApi('gtmOnFailure').wasNotCalled();
@@ -2317,10 +2663,10 @@ scenarios:
     runCode(mockData);
 
     assertThat(logCallCount).isEqualTo(1);
-    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event accepted but not processed (workspace Inspector event limit exceeded or event rejected)');
+    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
     assertThat(capturedLogArgs[1]).isEqualTo('boom');
 
-- name: Preview mode does not throw or log for non-JSON, empty, or null-typed response bodies
+- name: Preview mode never throws or logs for empty, non-JSON, brace-wrapped-garbage, array, or non-string response bodies
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
@@ -2379,6 +2725,43 @@ scenarios:
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
 
+    // Sub-check 5: brace-wrapped garbage. '{not-json}' starts with '{' and ends with
+    // '}', so the outer brace check alone would hand it to JSON.parse, which throws in
+    // the template-editor runner and would fail this scenario outright. The character
+    // after the opening brace must open a key ('"') or close an empty object ('}').
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{not-json}' });
+        return { catch: function() {} };
+      } };
+    });
+    runCode(mockData);
+    assertThat(logCallCount).isEqualTo(0);
+
+    // Sub-check 6: a non-string body (an already-parsed object). The getType guard
+    // rejects it before any string method runs, so the success:false inside it is
+    // never seen -- calling .trim() on a non-string would otherwise throw.
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: { success: false } });
+        return { catch: function() {} };
+      } };
+    });
+    runCode(mockData);
+    assertThat(logCallCount).isEqualTo(0);
+
+    // Sub-check 7: the boundary of the tightened guard. '{}' is a legal empty JSON
+    // object whose second character is '}', so it must still reach JSON.parse and
+    // simply carry no signal -- proving the tightening did not over-reject.
+    mock('sendHttpRequest', function(url, options, body) {
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{}' });
+        return { catch: function() {} };
+      } };
+    });
+    runCode(mockData);
+    assertThat(logCallCount).isEqualTo(0);
+
 - name: originHint set with app version sends the provided app version
   code: |-
     const JSON = require('JSON');
@@ -2402,6 +2785,7 @@ scenarios:
     const parsed = JSON.parse(capturedTrackBody);
     assertThat(parsed[0].originHint).isEqualTo('android');
     assertThat(parsed[0].appVersion).isEqualTo('3.1.4');
+
 - name: originHint set without app version sends null app version instead of the container default
   code: |-
     const JSON = require('JSON');
@@ -2423,7 +2807,15 @@ scenarios:
 
     assertThat(capturedTrackBody).isNotEqualTo(null);
     const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].originHint).isEqualTo('android');
+    // Presence matters here, not only the value: the key has to be on the body as
+    // an explicit null. An absent key would satisfy a value-only check in some
+    // assertion helpers, and the contract is "sent as literal JSON null" — the
+    // same thing every other Inspector sender emits for a source-scoped event
+    // with no version of its own.
+    assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
     assertThat(parsed[0].appVersion).isEqualTo(null);
+
 - name: originHint set with whitespace-only app version sends null app version
   code: |-
     const JSON = require('JSON');
@@ -2445,7 +2837,9 @@ scenarios:
 
     assertThat(capturedTrackBody).isNotEqualTo(null);
     const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
     assertThat(parsed[0].appVersion).isEqualTo(null);
+
 - name: app version without originHint overrides the container default
   code: |-
     const JSON = require('JSON');
@@ -2469,6 +2863,160 @@ scenarios:
     const parsed = JSON.parse(capturedTrackBody);
     assertThat(parsed[0].appVersion).isEqualTo('42');
     assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+
+- name: app version empty string without originHint keeps the container default
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.appVersion = '';
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    // Bottom-right cell of the matrix: no originHint and nothing usable in the
+    // parameter, so the container default must survive untouched.
+    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
+    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+
+- name: app version whitespace-only without originHint keeps the container default
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.appVersion = '   ';
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
+    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+
+- name: app version is trimmed
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.appVersion = '  3.1.4  ';
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    // Same normalization as the two coordinate fields: a GTM variable that
+    // resolves with stray whitespace must not become a distinct app version.
+    assertThat(parsed[0].appVersion).isEqualTo('3.1.4');
+
+- name: app version as a boolean is stringified like the other parameters
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.appVersion = true;
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    // GTM parameters are untyped, so booleans and numbers are stringified rather
+    // than discarded -- the same rule outputReference and originHint follow. Only
+    // objects and arrays (below) count as "nothing sendable".
+    assertThat(parsed[0].appVersion).isEqualTo('true');
+
+- name: app version as an object is treated as empty (null when originHint is set)
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
+    mockData.appVersion = {};
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
+    assertThat(parsed[0].appVersion).isEqualTo(null);
+
+- name: app version as an array is treated as empty (container default without originHint)
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    mockData.appVersion = [];
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getClientName', function() { return 'test_client'; });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/inspector/gtm/v1/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody);
+    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
 
 
 ___NOTES___

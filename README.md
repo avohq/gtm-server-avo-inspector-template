@@ -33,7 +33,7 @@ Use the **"Common fields to include in Inspector schemas"** table in the tag con
 
 ## Gateways
 
-Avo Inspector is moving to a multi-gate model: one Inspector API key per *gateway* (e.g. this server-side GTM container), rather than one Inspector source per destination. This tag has two optional parameters, **Output reference** and **Origin hint**, that let a gateway-scoped key tell observations apart.
+Avo Inspector is moving to a multi-gate model: one Inspector API key per *gateway* (e.g. this server-side GTM container), rather than one Inspector source per destination. This tag has three optional parameters — **Output reference**, **Origin hint** and **App version** — that let a gateway-scoped key tell observations apart.
 
 **Output reference** determines which checkpoint a tag instance observes:
 
@@ -42,23 +42,49 @@ Avo Inspector is moving to a multi-gate model: one Inspector API key per *gatewa
 
 To observe an output's checkpoint, fire this tag with the same trigger as the destination tag and add it to that destination's transformations. What this tag sends is the event as *this tag* sees it at that point — i.e. before the destination tag's own mapping runs, not the payload as it actually leaves the destination.
 
-Both fields are optional and independent: `outputReference` alone determines the checkpoint, `originHint` (below) can be set or omitted at either checkpoint.
+All three parameters are optional and independent: `outputReference` alone determines the checkpoint, and `originHint` / `appVersion` (below) can be set or omitted at either checkpoint.
 
 ## Origin hint
 
 **Origin hint** is a value identifying which source produced the event, e.g. `{{Event Data - platform}}`. Use the same field consistently across every Avo tag in the container, then map each value to a source in Avo.
 
 - Values must be **low-cardinality** (e.g. `android`, `ios`, `web`) — never a user identifier, session ID, or anything else unique per user or per event.
-- When Origin hint is set, the optional **App version** parameter is sent as the event's app version (or `null` when empty) — the container-level default never applies to a source-scoped event. Without Origin hint, App version overrides the default when set and falls back to it when empty.
 - The tag does not validate this at runtime; it only trims and stringifies the value you provide, so getting this right is on the tag configuration, not the code.
+- Origin hint also changes which app version the event carries — see below.
 
-> A customer's own event property literally named `outputReference` or `originHint` (with unrelated business meaning) is unaffected by this feature. It still appears in `eventProperties` exactly as before — the top-level `outputReference`/`originHint` fields described here come only from this tag's configuration, never from event data, and neither one overwrites or is affected by the other even though they share a key name.
+## App version
+
+**App version** is the version of the app that produced the event, e.g. `{{Event Data - app_version}}`. Like the other two parameters it is trimmed (numbers and booleans are stringified) and sent as a top-level field alongside the event schema, never inside the event's own properties.
+
+Because an Origin hint marks the event as belonging to a *different* source than this container, the container-level default version (`unversioned GTM server-side tag`) must not be attached to it. The two parameters therefore interact:
+
+| Origin hint | App version | Version reported for the event |
+| --- | --- | --- |
+| set | provided | the App version value |
+| set | empty | `null` — no version at all; the container default is deliberately not applied |
+| empty | provided | the App version value (overrides the container default) |
+| empty | empty | the container default, `unversioned GTM server-side tag` (unchanged behavior) |
+
+"Empty" means an empty string, a whitespace-only string, or a value the tag cannot turn into a string (an object or an array). Unlike `outputReference` and `originHint`, which are omitted entirely when empty, `appVersion` is always present on the body — as a literal JSON `null` in the second row above.
+
+> A customer's own event property literally named `outputReference`, `originHint` or `appVersion` (with unrelated business meaning) is unaffected by this feature. It still appears in `eventProperties` exactly as before — the top-level `outputReference`/`originHint`/`appVersion` fields described here come only from this tag's configuration, never from event data, and neither one overwrites or is affected by the other even though they share a key name.
 
 ## What the 200 means
 
-An HTTP 200 response from Avo means the event was **accepted**, not necessarily that it was fully processed. A workspace's Inspector event cap can silently drop an accepted event without changing the response status code.
+An HTTP 200 from Avo means the event was **accepted and queued**, not that it was processed. Turning the payload into an Inspector event, and Inspector's own sampling, both happen later in a background worker, and neither outcome is reflected in the response this tag sees.
 
-In GTM Preview mode, this tag inspects the response body and logs a console warning when it indicates a drop — for example when the workspace's event limit has been exceeded — so this is visible while testing rather than a silent gap. This logging only runs in Preview mode; it does not change whether the tag reports success or failure to GTM (`gtmOnSuccess/gtmOnFailure` are driven solely by the HTTP status code, unchanged by this behavior).
+| Response | What it means |
+| --- | --- |
+| `200 {"ok":true}` | Accepted and queued for processing. |
+| `200 {"success":false}` | Accepted, then dropped because the workspace's Inspector event limit is exhausted. This is the only post-acceptance drop visible in a 200 body. |
+| `200 {"ok":false}` | An unexpected server-side error while handling the request. |
+| `400 {"ok":false,"error":"..."}` | Rejected before acceptance: a missing or invalid Inspector key or environment header, or a body the server could not parse. |
+
+Only the first three reach the tag as a success — any non-2xx (including the 400 row) calls `gtmOnFailure`.
+
+In GTM Preview mode, the tag inspects the body of a 2xx response and logs a console warning for the two `false` shapes, so an event-limit drop or a server error is visible while you are testing rather than looking like a clean success. This logging only runs in Preview mode; it does not change whether the tag reports success or failure to GTM (`gtmOnSuccess`/`gtmOnFailure` are driven solely by the HTTP status code, unchanged by this behavior).
+
+A 200 therefore cannot tell you that an event was *processed*: an event that later fails to decode, or that Inspector's sampling discards, is indistinguishable from one that made it all the way through.
 
 ## Event Validation (dev/staging only)
 
