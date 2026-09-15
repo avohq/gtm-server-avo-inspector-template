@@ -22,7 +22,7 @@ ___INFO___
     "displayName": "",
     "thumbnail": "data:image/png;base64,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"
   },
-  "description": "Sends event metadata to Avo Inspector for tracking health monitoring. Resolves anonymous ID from event data as stream ID. Validates events against the tracking plan in dev/staging environments. Common GTM/GA4 fields are excluded from schemas by default and can be opted back in via tag configuration. Supports gateway-scoped Inspector keys via optional output reference, origin hint and origin app version parameters.",
+  "description": "Sends event schemas to Avo Inspector for tracking health monitoring and validates them against the tracking plan in dev/staging. Supports gateway output reference, origin hint and origin app version.",
   "containerContexts": [
     "SERVER"
   ]
@@ -623,27 +623,24 @@ function hasHeaderControlChars(value) {
 //                            Inspector event limit is exhausted. This is still
 //                            the only post-acceptance drop a 200 body ever
 //                            shows.
-//   200 {"ok": false}        accepted, then nothing stored: the endpoint could
-//                            not decode the request body into events. The body
-//                            carries a decode-failure count, the status stays
-//                            200, and no per-sender signal is raised anywhere
-//                            else — which is exactly why this is worth logging.
-//                            An unexpected server-side exception answers with
-//                            the same shape, because the API's error handler
-//                            responds without setting a status and so also
-//                            arrives as a 2xx.
+//   200 {"ok": false}        an unexpected server-side exception. The API's
+//                            error handler answers without setting a status,
+//                            so it arrives as a 2xx. It never reports a decode
+//                            failure: v2 responds before the body is decoded,
+//                            which happens in a worker afterwards.
 //   400 {"ok": false, "error": "..."}  rejected before acceptance: a missing or
-//                            invalid api-key or env header, or an Inspector key
-//                            the API does not recognize. A 400 never reaches
-//                            here — sendData routes any non-2xx straight to
-//                            gtmOnFailure — but it carries the same ok:false
-//                            shape as the 200 above, optionally with an "error"
+//                            invalid api-key or env header, an unsupported
+//                            content type or a body that is not valid JSON, or
+//                            an Inspector key the API does not recognize. A 400
+//                            never reaches here — sendData routes any non-2xx
+//                            straight to gtmOnFailure — but it carries the same
+//                            ok:false shape as the 200 above, with an "error"
 //                            string.
 // Both false-shapes are logged, hence the two signals matched below. The success
 // body carries "success":true, which the "success":false substring cannot match,
-// so the accepted case stays silent. Turning a decoded event into an Inspector
-// observation still happens in a background worker after this response is sent
-// and is never visible in it, so a clean 200 is silence, not proof of processing.
+// so the accepted case stays silent. Decoding the payload into an Inspector
+// event still happens in a background worker after this response is sent and is
+// never visible in it, so a clean 200 is silence, not proof of processing.
 function logDropIfAny(responseBody) {
   if (getType(responseBody) !== 'string') {
     return;
@@ -684,7 +681,7 @@ function logDropIfAny(responseBody) {
   // "error" string when there is one, and costs nothing when there is not.
   // Trimmed rather than raw so the logged value is exactly what the signal
   // match above ran against; surrounding whitespace carries no diagnosis.
-  log('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or the endpoint could not decode the request body)', trimmed);
+  log('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)', trimmed);
 }
 
 function extractSchema(gtmEvent) {
@@ -2724,7 +2721,7 @@ scenarios:
     runCode(mockData);
 
     assertThat(logCallCount).isEqualTo(1);
-    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or the endpoint could not decode the request body)');
+    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
     // The trimmed body is the second argument. It is the diagnostic, and it
     // carries the endpoint's optional "error" string whenever one is sent.
     assertThat(capturedLogArgs[1]).isEqualTo('{"success": false}');
@@ -2894,7 +2891,7 @@ scenarios:
     runCode(mockData);
 
     assertThat(logCallCount).isEqualTo(1);
-    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or the endpoint could not decode the request body)');
+    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
     assertThat(capturedLogArgs[1]).isEqualTo('{"ok": false, "error": "boom"}');
 
 - name: Preview mode never throws or logs for empty, non-JSON, brace-wrapped-garbage, array, or non-string response bodies
@@ -3018,7 +3015,7 @@ scenarios:
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(1);
-    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or the endpoint could not decode the request body)');
+    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
     assertThat(capturedLogArgs[1]).isEqualTo('{"ok":false,}');
     assertApi('gtmOnSuccess').wasCalled();
     assertApi('gtmOnFailure').wasNotCalled();
@@ -3034,7 +3031,7 @@ scenarios:
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(1);
-    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or the endpoint could not decode the request body)');
+    assertThat(capturedLogArgs[0]).isEqualTo('Avo Inspector: event not processed (workspace Inspector event limit exceeded, or a server-side error)');
 
     // Sub-check 3: surrounding whitespace. The logged second argument is the
     // trimmed body, which is exactly the string the signal match ran against,
