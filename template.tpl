@@ -60,6 +60,14 @@ ___TEMPLATE_PARAMETERS___
     "simpleValueType": true
   },
   {
+    "type": "CHECKBOX",
+    "name": "previewSendsToDev",
+    "checkboxText": "Send to the development environment in Preview mode",
+    "simpleValueType": true,
+    "defaultValue": true,
+    "help": "When checked, events this tag sends while the container runs in GTM Preview mode go to the development environment, whatever the Environment setting, and are validated against the tracking plan. Live traffic keeps using the Environment setting. Uncheck to always use the Environment setting."
+  },
+  {
     "type": "TEXT",
     "name": "outputReference",
     "displayName": "Output reference (optional)",
@@ -117,11 +125,20 @@ const encodeUriComponent = require('encodeUriComponent');
 
 const isPreview = getContainerVersion().previewMode;
 
+// The environment this event is sent to. In Preview mode it is 'dev', matching
+// the web GTM template, so testing a container never lands in the production
+// environment. Live traffic always uses the Environment setting. Only an
+// explicit `true` opts in: the checkbox defaults to checked on new tags, while
+// tag instances saved before it existed read it as undefined and keep sending
+// to the Environment setting in Preview mode, as they always have, until they
+// are next saved: the editor shows the default (checked) on such an instance.
+const env = isPreview && data.previewSendsToDev === true ? 'dev' : data.environment;
+
 let gtmEvent = getAllEventData();
 const streamId = extractAnonymousId(gtmEvent);
 const eventBody = handleEvent(gtmEvent, streamId);
 
-if (data.environment === 'dev' || data.environment === 'staging') {
+if (env === 'dev' || env === 'staging') {
   fetchAndValidate(gtmEvent, eventBody, streamId, function(validatedBody) {
     sendData([validatedBody]);
   });
@@ -140,9 +157,9 @@ function generateBaseBody(gtmEvent) {
     apiKey: data.inspectorKey,
     appName:
       gtmEvent.page_hostname != null ? gtmEvent.page_hostname : 'unnamed GTM server-side tag',
-    env: data.environment,
+    env: env,
     appVersion: 'unversioned GTM server-side tag',
-    libVersion: '2.2.0',
+    libVersion: '2.3.0',
     // Names this sender, and MUST be the same string as the X-Avo-Client header
     // sendData sets: the endpoint attributes traffic by the header and expects
     // the body to name the same sender. A constant, deliberately — this used to
@@ -573,7 +590,7 @@ function sendData(body) {
       // server-to-server sender.
       'content-type': 'application/json',
       'api-key': data.inspectorKey,
-      'env': data.environment,
+      'env': env,
       // Which sender this is, so ingestion can attribute traffic without
       // decoding a body. It MUST be the same string generateBaseBody writes to
       // libPlatform on every event — the header and the body field name the same
@@ -2472,7 +2489,7 @@ scenarios:
     assertThat(parsed[0].eventName).isEqualTo('test_event');
     assertThat(parsed[0].streamId).isEqualTo('client-abc');
     assertThat(parsed[0].anonymousId).isEqualTo('client-abc');
-    assertThat(parsed[0].libVersion).isEqualTo('2.2.0');
+    assertThat(parsed[0].libVersion).isEqualTo('2.3.0');
     assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
     assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
     assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
@@ -3293,6 +3310,174 @@ scenarios:
     const parsed = JSON.parse(capturedTrackBody);
     assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
 
+
+- name: Preview mode sends a prod tag to dev and validates it
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod", previewSendsToDev: true };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    let specFetchCalled = false;
+    let capturedHeaders = null;
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
+        specFetchCalled = true;
+        return { then: function(onResolve) {
+          onResolve({ statusCode: 200, body: JSON.stringify({ events: [] }) });
+          return { catch: function() {} };
+        } };
+      }
+      if (url.indexOf('/inspector/v2/track') !== -1) {
+        capturedHeaders = options.headers;
+        capturedTrackBody = body;
+      }
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedHeaders['env']).isEqualTo('dev');
+    assertThat(JSON.parse(capturedTrackBody)[0].env).isEqualTo('dev');
+    // dev takes the validation path, so the spec is fetched first.
+    assertThat(specFetchCalled).isEqualTo(true);
+    assertApi('gtmOnSuccess').wasCalled();
+
+- name: Preview mode sends a staging tag to dev
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "staging", previewSendsToDev: true };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    let capturedHeaders = null;
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
+        return { then: function(onResolve) {
+          onResolve({ statusCode: 200, body: JSON.stringify({ events: [] }) });
+          return { catch: function() {} };
+        } };
+      }
+      if (url.indexOf('/inspector/v2/track') !== -1) {
+        capturedHeaders = options.headers;
+        capturedTrackBody = body;
+      }
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedHeaders['env']).isEqualTo('dev');
+    assertThat(JSON.parse(capturedTrackBody)[0].env).isEqualTo('dev');
+
+- name: Preview mode with the checkbox unchecked keeps the Environment setting
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod", previewSendsToDev: false };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    let specFetchCalled = false;
+    let capturedHeaders = null;
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specFetchCalled = true; }
+      if (url.indexOf('/inspector/v2/track') !== -1) {
+        capturedHeaders = options.headers;
+        capturedTrackBody = body;
+      }
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedHeaders['env']).isEqualTo('prod');
+    assertThat(JSON.parse(capturedTrackBody)[0].env).isEqualTo('prod');
+    assertThat(specFetchCalled).isEqualTo(false);
+
+- name: Preview mode on a tag saved before the checkbox existed keeps the Environment setting
+  code: |-
+    const JSON = require('JSON');
+    // No previewSendsToDev key at all, as on a tag instance saved before the
+    // parameter existed: it must not opt in to the override.
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    let specFetchCalled = false;
+    let capturedHeaders = null;
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specFetchCalled = true; }
+      if (url.indexOf('/inspector/v2/track') !== -1) {
+        capturedHeaders = options.headers;
+        capturedTrackBody = body;
+      }
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedHeaders['env']).isEqualTo('prod');
+    assertThat(JSON.parse(capturedTrackBody)[0].env).isEqualTo('prod');
+    assertThat(specFetchCalled).isEqualTo(false);
+
+- name: Live traffic keeps the Environment setting with the checkbox checked
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod", previewSendsToDev: true };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let specFetchCalled = false;
+    let capturedHeaders = null;
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specFetchCalled = true; }
+      if (url.indexOf('/inspector/v2/track') !== -1) {
+        capturedHeaders = options.headers;
+        capturedTrackBody = body;
+      }
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedHeaders['env']).isEqualTo('prod');
+    assertThat(JSON.parse(capturedTrackBody)[0].env).isEqualTo('prod');
+    assertThat(specFetchCalled).isEqualTo(false);
 
 ___NOTES___
 
