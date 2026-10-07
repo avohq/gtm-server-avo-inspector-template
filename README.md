@@ -6,6 +6,12 @@ Learn more about Avo Inspector [here](https://www.avo.app/docs/data-design/start
 
 > Note: No user data is sent to Avo.
 
+## Environment in Preview mode
+
+While the container runs in GTM Preview mode, the tag sends events to the `dev` environment whatever the **Environment** parameter says, the same way the web GTM template does. Testing a container therefore never lands in your production data, and previewed events are validated against the tracking plan (see [Event Validation](#event-validation-devstaging-only)). Live traffic is unaffected and always uses the **Environment** parameter, including traffic that reaches the container while a preview session is open.
+
+To keep the configured environment in Preview mode too, uncheck **"Send to the development environment in Preview mode"**. Tag instances saved before this option existed behave as if it were checked.
+
 ## Anonymous ID / Stream ID
 
 The template automatically resolves an anonymous ID from the event data to use as the stream identifier. It checks the following fields in priority order:
@@ -84,7 +90,7 @@ with these headers:
 | Header | Value |
 | --- | --- |
 | `api-key` | the Inspector key from the tag configuration |
-| `env` | `dev`, `staging` or `prod`, from the Environment parameter |
+| `env` | `dev`, `staging` or `prod`, from the Environment parameter — `dev` in Preview mode unless that is turned off (see [Environment in Preview mode](#environment-in-preview-mode)) |
 | `X-Avo-Client` | `gtm-server` |
 | `content-type` | `application/json` |
 
