@@ -10,7 +10,7 @@ Learn more about Avo Inspector [here](https://www.avo.app/docs/data-design/start
 
 While the container runs in GTM Preview mode, the tag sends events to the `dev` environment whatever the **Environment** parameter says, the same way the web GTM template does. Testing a container therefore never lands in your production data, and previewed events are validated against the tracking plan (see [Event Validation](#event-validation-devstaging-only)). Live traffic is unaffected and always uses the **Environment** parameter, including traffic that reaches the container while a preview session is open.
 
-This is controlled by the **"Send to the development environment in Preview mode"** checkbox, which is checked by default on new tags. Tag instances saved before this option existed keep their previous behavior — the configured environment in Preview mode too — until you open the tag, tick the box and save it.
+This is controlled by the **"Send to the development environment in Preview mode"** checkbox, which is checked by default on new tags. Tag instances saved before this option existed keep their previous behavior — the configured environment in Preview mode too — until the tag is next saved in the GTM editor. The editor shows the box checked on such a tag (it fills in the default), so saving the tag for any reason turns the override on; uncheck the box before saving to keep the old behavior.
 
 ## Anonymous ID / Stream ID
 

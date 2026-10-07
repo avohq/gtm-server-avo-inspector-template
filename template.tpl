@@ -130,7 +130,8 @@ const isPreview = getContainerVersion().previewMode;
 // environment. Live traffic always uses the Environment setting. Only an
 // explicit `true` opts in: the checkbox defaults to checked on new tags, while
 // tag instances saved before it existed read it as undefined and keep sending
-// to the Environment setting in Preview mode, as they always have.
+// to the Environment setting in Preview mode, as they always have, until they
+// are next saved: the editor shows the default (checked) on such an instance.
 const env = isPreview && data.previewSendsToDev === true ? 'dev' : data.environment;
 
 let gtmEvent = getAllEventData();
