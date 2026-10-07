@@ -18,7 +18,7 @@ versions:
   # Latest version
   - sha: <pending-merge-sha>
     changeNotes: |2
-      Feature: in GTM Preview mode the tag now sends to the development environment, whatever the Environment setting, matching the web GTM template. Previewed events therefore never reach production data, and they are validated against the tracking plan like any dev event. Live traffic is unchanged and always uses the Environment setting. A new "Send to the development environment in Preview mode" checkbox, checked by default, turns this off; tag instances saved before it existed behave as if it were checked. libVersion 2.3.0.
+      Feature: in GTM Preview mode the tag now sends to the development environment, whatever the Environment setting, matching the web GTM template. Previewed events therefore never reach production data, and they are validated against the tracking plan like any dev event. Live traffic is unchanged and always uses the Environment setting. This is controlled by a new "Send to the development environment in Preview mode" checkbox, checked by default on new tags. Tag instances saved before it existed keep their previous behavior, sending to the configured environment in Preview mode too, until the box is ticked and the tag saved. libVersion 2.3.0.
   # Older versions
   - sha: f033dd2d3c19513cc1f7c700b868186fe72cecce
     changeNotes: |2

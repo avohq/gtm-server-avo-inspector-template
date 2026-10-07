@@ -128,9 +128,10 @@ const isPreview = getContainerVersion().previewMode;
 // The environment this event is sent to. In Preview mode it is 'dev', matching
 // the web GTM template, so testing a container never lands in the production
 // environment. Live traffic always uses the Environment setting. Only an
-// explicit `false` opts out: tag instances saved before the checkbox existed
-// read it as undefined and get the new behavior too.
-const env = isPreview && data.previewSendsToDev !== false ? 'dev' : data.environment;
+// explicit `true` opts in: the checkbox defaults to checked on new tags, while
+// tag instances saved before it existed read it as undefined and keep sending
+// to the Environment setting in Preview mode, as they always have.
+const env = isPreview && data.previewSendsToDev === true ? 'dev' : data.environment;
 
 let gtmEvent = getAllEventData();
 const streamId = extractAnonymousId(gtmEvent);
@@ -3312,7 +3313,7 @@ scenarios:
 - name: Preview mode sends a prod tag to dev and validates it
   code: |-
     const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
+    const mockData = { inspectorKey: "test-key", environment: "prod", previewSendsToDev: true };
 
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1' };
@@ -3342,8 +3343,6 @@ scenarios:
 
     runCode(mockData);
 
-    // previewSendsToDev is undefined here, as on a tag saved before the
-    // checkbox existed: that must still mean dev in Preview mode.
     assertThat(capturedHeaders['env']).isEqualTo('dev');
     assertThat(JSON.parse(capturedTrackBody)[0].env).isEqualTo('dev');
     // dev takes the validation path, so the spec is fetched first.
@@ -3388,6 +3387,39 @@ scenarios:
   code: |-
     const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod", previewSendsToDev: false };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    let specFetchCalled = false;
+    let capturedHeaders = null;
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specFetchCalled = true; }
+      if (url.indexOf('/inspector/v2/track') !== -1) {
+        capturedHeaders = options.headers;
+        capturedTrackBody = body;
+      }
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedHeaders['env']).isEqualTo('prod');
+    assertThat(JSON.parse(capturedTrackBody)[0].env).isEqualTo('prod');
+    assertThat(specFetchCalled).isEqualTo(false);
+
+- name: Preview mode on a tag saved before the checkbox existed keeps the Environment setting
+  code: |-
+    const JSON = require('JSON');
+    // No previewSendsToDev key at all, as on a tag instance saved before the
+    // parameter existed: it must not opt in to the override.
+    const mockData = { inspectorKey: "test-key", environment: "prod" };
 
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1' };
