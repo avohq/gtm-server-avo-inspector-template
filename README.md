@@ -136,6 +136,8 @@ Validation includes constraint checks:
 
 Regex validation is not supported in GTM Server's sandboxed JavaScript environment.
 
+When the tag has gateway coordinates set, the spec fetch carries them too, so the event is validated against the spec *as expected at this tag's checkpoint*: `originHint` alone fetches the gateway-input checkpoint's spec, and `originHint` plus `outputReference` fetches that output's spec. The values are the same ones sent on the track body — trimmed, and a parameter that is empty is left off the URL entirely rather than sent blank. Without either parameter the request URL is exactly what it was before, and a source-scoped key ignores the parameters. A gateway-scoped key with no `originHint` gets no spec back (404), so the event is sent unvalidated, exactly as for any other failed spec fetch.
+
 In production, events are sent directly without spec fetching or validation, optimizing for throughput.
 
 If the spec fetch fails in dev/staging, the event is still sent without validation metadata.

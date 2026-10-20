@@ -142,7 +142,7 @@ function generateBaseBody(gtmEvent) {
       gtmEvent.page_hostname != null ? gtmEvent.page_hostname : 'unnamed GTM server-side tag',
     env: data.environment,
     appVersion: 'unversioned GTM server-side tag',
-    libVersion: '2.2.0',
+    libVersion: '2.3.0',
     // Names this sender, and MUST be the same string as the X-Avo-Client header
     // sendData sets: the endpoint attributes traffic by the header and expects
     // the body to name the same sender. A constant, deliberately — this used to
@@ -223,10 +223,30 @@ function setHintField(body, key, rawValue) {
   }
 }
 
+// Gateway coordinates for the spec fetch: the same normalized values
+// setHintField put on the track body (trimmed; absent when blank), so the spec
+// validated against is the event as expected at this tag's checkpoint —
+// originHint alone selects the gateway-input checkpoint, originHint plus
+// outputReference selects that output's. A param is appended only when its
+// field is on the body, so a tag without coordinates fetches the exact same
+// URL as before. A spec is fetched per request and never cached, so there is
+// no cache key to extend.
+function specCoordinateParams(eventBody) {
+  var params = '';
+  if (getType(eventBody.originHint) === 'string') {
+    params = params + '&originHint=' + encodeUriComponent(eventBody.originHint);
+  }
+  if (getType(eventBody.outputReference) === 'string') {
+    params = params + '&outputReference=' + encodeUriComponent(eventBody.outputReference);
+  }
+  return params;
+}
+
 function fetchAndValidate(gtmEvent, eventBody, streamId, callback) {
   const specUrl = 'https://api.avo.app/trackingPlan/eventSpec?apiKey=' +
     encodeUriComponent(data.inspectorKey) + '&streamId=' + encodeUriComponent(streamId) +
-    '&eventName=' + encodeUriComponent(gtmEvent.event_name);
+    '&eventName=' + encodeUriComponent(gtmEvent.event_name) +
+    specCoordinateParams(eventBody);
 
   sendHttpRequest(specUrl, {
     headers: { 'accept': 'application/json' },
@@ -1585,6 +1605,163 @@ scenarios:
     assertThat(priceProp.failedEventIds[0]).isEqualTo('evt-1');
     assertThat(priceProp.passedEventIds).isEqualTo(undefined);
 
+- name: Spec fetch URL without gateway coordinates is unchanged (dev)
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "dev" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let specUrl = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specUrl = url; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200, body: '{"events":[]}' }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    // Pinned byte-for-byte: source keys and tags without coordinates fetch exactly what they did before.
+    assertThat(specUrl).isEqualTo('https://api.avo.app/trackingPlan/eventSpec?apiKey=test-key&streamId=c1&eventName=purchase');
+
+- name: Spec fetch URL carries originHint alone when only originHint is set (dev)
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "dev", originHint: "  android  " };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let specUrl = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specUrl = url; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200, body: '{"events":[]}' }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(specUrl).isEqualTo('https://api.avo.app/trackingPlan/eventSpec?apiKey=test-key&streamId=c1&eventName=purchase&originHint=android');
+
+- name: Spec fetch URL carries originHint and outputReference, URI-encoded (dev)
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "staging", originHint: "web app", outputReference: "meta/x7k2q&y" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let specUrl = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specUrl = url; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200, body: '{"events":[]}' }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(specUrl).isEqualTo('https://api.avo.app/trackingPlan/eventSpec?apiKey=test-key&streamId=c1&eventName=purchase&originHint=web%20app&outputReference=meta%2Fx7k2q%26y');
+
+- name: Spec fetch URL carries outputReference alone when only outputReference is set (dev)
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "dev", outputReference: "meta-x7k2q" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let specUrl = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specUrl = url; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200, body: '{"events":[]}' }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(specUrl).isEqualTo('https://api.avo.app/trackingPlan/eventSpec?apiKey=test-key&streamId=c1&eventName=purchase&outputReference=meta-x7k2q');
+
+- name: Spec fetch URL omits blank and unusable gateway coordinates (dev)
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "dev", originHint: "   ", outputReference: "" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let specUrls = [];
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specUrls.push(url); }
+      return { then: function(onResolve) { onResolve({ statusCode: 200, body: '{"events":[]}' }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+    // Values the tag cannot turn into a string are omitted too, never sent as empty params.
+    runCode({ inspectorKey: "test-key", environment: "dev", originHint: null, outputReference: {} });
+
+    const base = 'https://api.avo.app/trackingPlan/eventSpec?apiKey=test-key&streamId=c1&eventName=purchase';
+    assertThat(specUrls.length).isEqualTo(2);
+    assertThat(specUrls[0]).isEqualTo(base);
+    assertThat(specUrls[1]).isEqualTo(base);
+
+- name: Gateway spec 404 without originHint still sends the event unvalidated (dev)
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "dev", outputReference: "meta-x7k2q" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com', price: 500 };
+    });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
+        return { then: function(onResolve) {
+          onResolve({ statusCode: 404, body: '{"error":"event_not_found","name":"purchase"}' });
+          return { catch: function() {} };
+        } };
+      }
+      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+    });
+
+    runCode(mockData);
+
+    assertThat(capturedTrackBody).isNotEqualTo(null);
+    const parsed = JSON.parse(capturedTrackBody)[0];
+    assertThat(parsed.outputReference).isEqualTo('meta-x7k2q');
+    assertThat(parsed.hasOwnProperty('eventSpecMetadata')).isEqualTo(false);
+    // No spec means no value checks: properties keep the schema defaults.
+    for (let i = 0; i < parsed.eventProperties.length; i++) {
+      assertThat(parsed.eventProperties[i].failedEventIds).isEqualTo(null);
+      assertThat(parsed.eventProperties[i].hasOwnProperty('passedEventIds')).isEqualTo(false);
+    }
+
+- name: Tag instances at different checkpoints fetch distinct spec URLs (dev)
+  code: |-
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: false }; });
+
+    let specUrls = [];
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specUrls.push(url); }
+      return { then: function(onResolve) { onResolve({ statusCode: 200, body: '{"events":[]}' }); return { catch: function() {} }; } };
+    });
+
+    runCode({ inspectorKey: "test-key", environment: "dev", originHint: "android" });
+    runCode({ inspectorKey: "test-key", environment: "dev", originHint: "android", outputReference: "meta-x7k2q" });
+    runCode({ inspectorKey: "test-key", environment: "dev", originHint: "android", outputReference: "ga4-9v3mp" });
+
+    assertThat(specUrls.length).isEqualTo(3);
+    assertThat(specUrls[0]).isNotEqualTo(specUrls[1]);
+    assertThat(specUrls[1]).isNotEqualTo(specUrls[2]);
+    assertThat(specUrls[0]).isNotEqualTo(specUrls[2]);
+
 - name: Excludes common fields from the schema by default
   code: |-
     const JSON = require('JSON');
@@ -2472,7 +2649,7 @@ scenarios:
     assertThat(parsed[0].eventName).isEqualTo('test_event');
     assertThat(parsed[0].streamId).isEqualTo('client-abc');
     assertThat(parsed[0].anonymousId).isEqualTo('client-abc');
-    assertThat(parsed[0].libVersion).isEqualTo('2.2.0');
+    assertThat(parsed[0].libVersion).isEqualTo('2.3.0');
     assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
     assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
     assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
