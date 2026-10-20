@@ -142,7 +142,7 @@ function generateBaseBody(gtmEvent) {
       gtmEvent.page_hostname != null ? gtmEvent.page_hostname : 'unnamed GTM server-side tag',
     env: data.environment,
     appVersion: 'unversioned GTM server-side tag',
-    libVersion: '2.2.0',
+    libVersion: '2.3.0',
     // Names this sender, and MUST be the same string as the X-Avo-Client header
     // sendData sets: the endpoint attributes traffic by the header and expects
     // the body to name the same sender. A constant, deliberately — this used to
@@ -2649,7 +2649,7 @@ scenarios:
     assertThat(parsed[0].eventName).isEqualTo('test_event');
     assertThat(parsed[0].streamId).isEqualTo('client-abc');
     assertThat(parsed[0].anonymousId).isEqualTo('client-abc');
-    assertThat(parsed[0].libVersion).isEqualTo('2.2.0');
+    assertThat(parsed[0].libVersion).isEqualTo('2.3.0');
     assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
     assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
     assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
