@@ -1869,142 +1869,169 @@ scenarios:
     assertThat(names.indexOf('currency')).isEqualTo(-1);
     assertThat(names.indexOf('custom_prop')).isNotEqualTo(-1);
 
-- name: outputReference set, originHint unset omits originHint key
+- name: Gateway hint fields are normalized, omitted when blank and kept separate from event data (merged)
   code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q" };
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
-    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
-
-- name: Blank or unusable outputReference values omit the key
-  code: |-
-    // undefined is a tag instance saved before the parameter existed.
-    const values = [undefined, '', '   ', null, {}, []];
-    for (let i = 0; i < values.length; i++) {
-      const sent = runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", outputReference: values[i] });
-      assertThat(sent.hasOwnProperty('outputReference'), 'outputReference value #' + i).isEqualTo(false);
+    function resetDefaults() {
+      mock('getContainerVersion', function() { return { previewMode: false }; });
+      mock('getAllEventData', function() { return { event_name: 'purchase', client_id: 'c1' }; });
     }
 
-- name: outputReference as a padded string is trimmed
-  code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.outputReference = '  meta-x7k2q  ';
+    // outputReference set, originHint unset omits originHint key
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q" };
 
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
 
-    runCode(mockData);
+      runCode(mockData);
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
+      assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+    })();
 
-- name: outputReference numbers and booleans are stringified
-  code: |-
-    assertThat(runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", outputReference: 42 }).outputReference).isEqualTo('42');
-    assertThat(runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", outputReference: false }).outputReference).isEqualTo('false');
+    // Blank or unusable outputReference values omit the key
+    resetDefaults();
+    (function() {
+      // undefined is a tag instance saved before the parameter existed.
+      const values = [undefined, '', '   ', null, {}, []];
+      for (let i = 0; i < values.length; i++) {
+        const sent = runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", outputReference: values[i] });
+        assertThat(sent.hasOwnProperty('outputReference'), 'outputReference value #' + i).isEqualTo(false);
+      }
+    })();
 
-- name: originHint as a plain string is trimmed and sent
-  code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originHint = '  android  ';
+    // outputReference as a padded string is trimmed
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod" };
+      mockData.outputReference = '  meta-x7k2q  ';
 
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
 
-    runCode(mockData);
+      runCode(mockData);
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].originHint).isEqualTo('android');
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
+    })();
 
-- name: originHint numbers and booleans are stringified
-  code: |-
-    assertThat(runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", originHint: 123 }).originHint).isEqualTo('123');
-    assertThat(runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", originHint: true }).originHint).isEqualTo('true');
+    // outputReference numbers and booleans are stringified
+    resetDefaults();
+    (function() {
+      assertThat(runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", outputReference: 42 }).outputReference).isEqualTo('42');
+      assertThat(runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", outputReference: false }).outputReference).isEqualTo('false');
+    })();
 
-- name: Blank or unusable originHint values omit the key
-  code: |-
-    const values = [undefined, null, '', '   ', {}, []];
-    for (let i = 0; i < values.length; i++) {
-      const sent = runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", originHint: values[i] });
-      assertThat(sent.hasOwnProperty('originHint'), 'originHint value #' + i).isEqualTo(false);
-      // originHint absent means the app-version rule falls back to the container default.
-      assertThat(sent.appVersion, 'originHint value #' + i).isEqualTo('unversioned GTM server-side tag');
-    }
+    // originHint as a plain string is trimmed and sent
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod" };
+      mockData.originHint = '  android  ';
 
-- name: Both outputReference and originHint set are both present
-  code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q", originHint: "android" };
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
 
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
+      runCode(mockData);
 
-    runCode(mockData);
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].originHint).isEqualTo('android');
+    })();
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
-    assertThat(parsed[0].originHint).isEqualTo('android');
+    // originHint numbers and booleans are stringified
+    resetDefaults();
+    (function() {
+      assertThat(runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", originHint: 123 }).originHint).isEqualTo('123');
+      assertThat(runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", originHint: true }).originHint).isEqualTo('true');
+    })();
 
-- name: Only originHint set leaves outputReference absent
-  code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
+    // Blank or unusable originHint values omit the key
+    resetDefaults();
+    (function() {
+      const values = [undefined, null, '', '   ', {}, []];
+      for (let i = 0; i < values.length; i++) {
+        const sent = runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", originHint: values[i] });
+        assertThat(sent.hasOwnProperty('originHint'), 'originHint value #' + i).isEqualTo(false);
+        // originHint absent means the app-version rule falls back to the container default.
+        assertThat(sent.appVersion, 'originHint value #' + i).isEqualTo('unversioned GTM server-side tag');
+      }
+    })();
 
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
+    // Both outputReference and originHint set are both present
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q", originHint: "android" };
 
-    runCode(mockData);
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
-    assertThat(parsed[0].originHint).isEqualTo('android');
+      runCode(mockData);
 
-- name: Neither outputReference nor originHint ever appears as a propertyName in eventProperties
-  code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q", originHint: "android" };
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
+      assertThat(parsed[0].originHint).isEqualTo('android');
+    })();
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1', item_name: 'Test Product', price: 9.99 };
-    });
+    // Only originHint set leaves outputReference absent
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
 
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
 
-    runCode(mockData);
+      runCode(mockData);
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const props = JSON.parse(capturedTrackBody)[0].eventProperties;
-    let names = [];
-    for (let i = 0; i < props.length; i++) { names.push(props[i].propertyName); }
-    assertThat(names.indexOf('outputReference')).isEqualTo(-1);
-    assertThat(names.indexOf('originHint')).isEqualTo(-1);
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
+      assertThat(parsed[0].originHint).isEqualTo('android');
+    })();
+
+    // Neither outputReference nor originHint ever appears as a propertyName in eventProperties
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q", originHint: "android" };
+
+      mock('getAllEventData', function() {
+        return { event_name: 'purchase', client_id: 'c1', item_name: 'Test Product', price: 9.99 };
+      });
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const props = JSON.parse(capturedTrackBody)[0].eventProperties;
+      let names = [];
+      for (let i = 0; i < props.length; i++) { names.push(props[i].propertyName); }
+      assertThat(names.indexOf('outputReference')).isEqualTo(-1);
+      assertThat(names.indexOf('originHint')).isEqualTo(-1);
+    })();
 
 - name: Event data property literally named outputReference coexists with the tag-config outputReference
   code: |-
@@ -2598,164 +2625,189 @@ scenarios:
     assertThat(logCallCount).isEqualTo(1);
     assertThat(capturedLogArgs[1]).isEqualTo('{"ok":false}');
 
-- name: originHint set with origin app version sends the provided app version
+- name: Origin app version sets appVersion with and without originHint (merged)
   code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android", originAppVersion: "3.1.4" };
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].originHint).isEqualTo('android');
-    assertThat(parsed[0].appVersion).isEqualTo('3.1.4');
-
-- name: originHint set without origin app version sends null app version instead of the container default
-  code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].originHint).isEqualTo('android');
-    // Presence matters here, not only the value: the key has to be on the body as
-    // an explicit null. An absent key would satisfy a value-only check in some
-    // assertion helpers, and the contract is "sent as literal JSON null" — the
-    // same thing every other Inspector sender emits for a source-scoped event
-    // with no version of its own.
-    assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
-    assertThat(parsed[0].appVersion).isEqualTo(null);
-
-- name: originHint set with whitespace-only origin app version sends null app version
-  code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android", originAppVersion: "   " };
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
-    assertThat(parsed[0].appVersion).isEqualTo(null);
-
-- name: origin app version without originHint overrides the container default
-  code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod", originAppVersion: 42 };
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].appVersion).isEqualTo('42');
-    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
-
-- name: Blank origin app version without originHint keeps the container default
-  code: |-
-    // Bottom-right cell of the matrix: no originHint and nothing usable in the
-    // parameter, so the container default must survive untouched.
-    const values = ['', '   '];
-    for (let i = 0; i < values.length; i++) {
-      const sent = runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", originAppVersion: values[i] });
-      assertThat(sent.appVersion, 'origin app version #' + i).isEqualTo('unversioned GTM server-side tag');
-      assertThat(sent.hasOwnProperty('originHint'), 'origin app version #' + i).isEqualTo(false);
+    function resetDefaults() {
+      mock('getContainerVersion', function() { return { previewMode: false }; });
+      mock('getAllEventData', function() { return { event_name: 'purchase', client_id: 'c1' }; });
     }
 
-- name: origin app version is trimmed
-  code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originAppVersion = '  3.1.4  ';
+    // originHint set with origin app version sends the provided app version
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android", originAppVersion: "3.1.4" };
 
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
 
-    runCode(mockData);
+      runCode(mockData);
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    // Same normalization as the two coordinate fields: a GTM variable that
-    // resolves with stray whitespace must not become a distinct app version.
-    assertThat(parsed[0].appVersion).isEqualTo('3.1.4');
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].originHint).isEqualTo('android');
+      assertThat(parsed[0].appVersion).isEqualTo('3.1.4');
+    })();
 
-- name: origin app version as a boolean is stringified like the other parameters
-  code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originAppVersion = true;
+    // originHint set without origin app version sends null app version instead of the container default
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
 
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
 
-    runCode(mockData);
+      runCode(mockData);
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    // GTM parameters are untyped, so booleans and numbers are stringified rather
-    // than discarded -- the same rule outputReference and originHint follow. Only
-    // objects and arrays (below) count as "nothing sendable".
-    assertThat(parsed[0].appVersion).isEqualTo('true');
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].originHint).isEqualTo('android');
+      // Presence matters here, not only the value: the key has to be on the body as
+      // an explicit null. An absent key would satisfy a value-only check in some
+      // assertion helpers, and the contract is "sent as literal JSON null" — the
+      // same thing every other Inspector sender emits for a source-scoped event
+      // with no version of its own.
+      assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
+      assertThat(parsed[0].appVersion).isEqualTo(null);
+    })();
 
-- name: origin app version as an object is treated as empty (null when originHint is set)
-  code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
-    mockData.originAppVersion = {};
+    // originHint set with whitespace-only origin app version sends null app version
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android", originAppVersion: "   " };
 
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
 
-    runCode(mockData);
+      runCode(mockData);
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
-    assertThat(parsed[0].appVersion).isEqualTo(null);
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
+      assertThat(parsed[0].appVersion).isEqualTo(null);
+    })();
 
-- name: origin app version as an array is treated as empty (container default without originHint)
-  code: |-
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originAppVersion = [];
+    // origin app version without originHint overrides the container default
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", originAppVersion: 42 };
 
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return respond(200);
-    });
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
 
-    runCode(mockData);
+      runCode(mockData);
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].appVersion).isEqualTo('42');
+      assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+    })();
+
+    // Blank origin app version without originHint keeps the container default
+    resetDefaults();
+    (function() {
+      // Bottom-right cell of the matrix: no originHint and nothing usable in the
+      // parameter, so the container default must survive untouched.
+      const values = ['', '   '];
+      for (let i = 0; i < values.length; i++) {
+        const sent = runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", originAppVersion: values[i] });
+        assertThat(sent.appVersion, 'origin app version #' + i).isEqualTo('unversioned GTM server-side tag');
+        assertThat(sent.hasOwnProperty('originHint'), 'origin app version #' + i).isEqualTo(false);
+      }
+    })();
+
+    // origin app version is trimmed
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod" };
+      mockData.originAppVersion = '  3.1.4  ';
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      // Same normalization as the two coordinate fields: a GTM variable that
+      // resolves with stray whitespace must not become a distinct app version.
+      assertThat(parsed[0].appVersion).isEqualTo('3.1.4');
+    })();
+
+    // origin app version as a boolean is stringified like the other parameters
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod" };
+      mockData.originAppVersion = true;
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      // GTM parameters are untyped, so booleans and numbers are stringified rather
+      // than discarded -- the same rule outputReference and originHint follow. Only
+      // objects and arrays (below) count as "nothing sendable".
+      assertThat(parsed[0].appVersion).isEqualTo('true');
+    })();
+
+    // origin app version as an object is treated as empty (null when originHint is set)
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
+      mockData.originAppVersion = {};
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
+      assertThat(parsed[0].appVersion).isEqualTo(null);
+    })();
+
+    // origin app version as an array is treated as empty (container default without originHint)
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod" };
+      mockData.originAppVersion = [];
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
+    })();
 
 - name: Preview mode sends a prod or staging tag to dev and validates it
   code: |-
@@ -2888,6 +2940,7 @@ scenarios:
     assertThat(capturedHeaders['env']).isEqualTo('prod');
     assertThat(JSON.parse(capturedTrackBody)[0].env).isEqualTo('prod');
     assertThat(specFetchCalled).isEqualTo(false);
+
 setup: |-
   const JSON = require('JSON');
 
