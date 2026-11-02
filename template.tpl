@@ -3625,6 +3625,46 @@ scenarios:
     assertThat(JSON.parse(capturedTrackBody)[0].env).isEqualTo('prod');
     assertThat(specFetchCalled).isEqualTo(false);
 
+- name: Preview mode on a prod gateway tag fetches the spec with its gateway coordinates
+  code: |-
+    const JSON = require('JSON');
+    const mockData = { inspectorKey: "test-key", environment: "prod", previewSendsToDev: true, originHint: "web app", outputReference: "meta/x7k2q" };
+
+    mock('getAllEventData', function() {
+      return { event_name: 'purchase', client_id: 'c1' };
+    });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    let specUrl = null;
+    let capturedHeaders = null;
+    let capturedTrackBody = null;
+    mock('sendHttpRequest', function(url, options, body) {
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
+        specUrl = url;
+        return { then: function(onResolve) {
+          onResolve({ statusCode: 200, body: JSON.stringify({ events: [] }) });
+          return { catch: function() {} };
+        } };
+      }
+      if (url.indexOf('/inspector/v2/track') !== -1) {
+        capturedHeaders = options.headers;
+        capturedTrackBody = body;
+      }
+      return { then: function(onResolve) {
+        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
+        return { catch: function() {} };
+      } };
+    });
+
+    runCode(mockData);
+
+    assertThat(specUrl).isEqualTo('https://api.avo.app/trackingPlan/eventSpec?apiKey=test-key&streamId=c1&eventName=purchase&originHint=web%20app&outputReference=meta%2Fx7k2q');
+    assertThat(capturedHeaders['env']).isEqualTo('dev');
+    const sent = JSON.parse(capturedTrackBody)[0];
+    assertThat(sent.env).isEqualTo('dev');
+    assertThat(sent.originHint).isEqualTo('web app');
+    assertThat(sent.outputReference).isEqualTo('meta/x7k2q');
+
 - name: Live traffic keeps the Environment setting with the checkbox checked
   code: |-
     const JSON = require('JSON');
