@@ -60,6 +60,14 @@ ___TEMPLATE_PARAMETERS___
     "simpleValueType": true
   },
   {
+    "type": "CHECKBOX",
+    "name": "previewSendsToDev",
+    "checkboxText": "Send to the development environment in Preview mode",
+    "simpleValueType": true,
+    "defaultValue": true,
+    "help": "When checked, events this tag sends while the container runs in GTM Preview mode go to the development environment, whatever the Environment setting, and are validated against the tracking plan. Live traffic keeps using the Environment setting. Uncheck to always use the Environment setting."
+  },
+  {
     "type": "TEXT",
     "name": "outputReference",
     "displayName": "Output reference (optional)",
@@ -117,11 +125,20 @@ const encodeUriComponent = require('encodeUriComponent');
 
 const isPreview = getContainerVersion().previewMode;
 
+// The environment this event is sent to. In Preview mode it is 'dev', matching
+// the web GTM template, so testing a container never lands in the production
+// environment. Live traffic always uses the Environment setting. Only an
+// explicit `true` opts in: the checkbox defaults to checked on new tags, while
+// tag instances saved before it existed read it as undefined and keep sending
+// to the Environment setting in Preview mode, as they always have, until they
+// are next saved: the editor shows the default (checked) on such an instance.
+const env = isPreview && data.previewSendsToDev === true ? 'dev' : data.environment;
+
 let gtmEvent = getAllEventData();
 const streamId = extractAnonymousId(gtmEvent);
 const eventBody = handleEvent(gtmEvent, streamId);
 
-if (data.environment === 'dev' || data.environment === 'staging') {
+if (env === 'dev' || env === 'staging') {
   fetchAndValidate(gtmEvent, eventBody, streamId, function(validatedBody) {
     sendData([validatedBody]);
   });
@@ -140,9 +157,9 @@ function generateBaseBody(gtmEvent) {
     apiKey: data.inspectorKey,
     appName:
       gtmEvent.page_hostname != null ? gtmEvent.page_hostname : 'unnamed GTM server-side tag',
-    env: data.environment,
+    env: env,
     appVersion: 'unversioned GTM server-side tag',
-    libVersion: '2.3.0',
+    libVersion: '2.4.0',
     // Names this sender, and MUST be the same string as the X-Avo-Client header
     // sendData sets: the endpoint attributes traffic by the header and expects
     // the body to name the same sender. A constant, deliberately — this used to
@@ -593,7 +610,7 @@ function sendData(body) {
       // server-to-server sender.
       'content-type': 'application/json',
       'api-key': data.inspectorKey,
-      'env': data.environment,
+      'env': env,
       // Which sender this is, so ingestion can attribute traffic without
       // decoding a body. It MUST be the same string generateBaseBody writes to
       // libPlatform on every event — the header and the body field name the same
@@ -972,7 +989,6 @@ ___TESTS___
 scenarios:
 - name: Sends an event with anonymousId and no session (dev with spec fetch)
   code: |-
-    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev"
@@ -988,10 +1004,6 @@ scenarios:
       };
     });
 
-    mock('getContainerVersion', function() {
-      return { previewMode: false };
-    });
-
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
         return { then: function(onResolve) {
@@ -1002,10 +1014,7 @@ scenarios:
           return { catch: function() {} };
         } };
       }
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200 });
-        return { catch: function() {} };
-      } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1014,7 +1023,6 @@ scenarios:
 
 - name: Uses client_id as anonymousId
   code: |-
-    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev"
@@ -1027,19 +1035,12 @@ scenarios:
       };
     });
 
-    mock('getContainerVersion', function() {
-      return { previewMode: false };
-    });
-
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) {
         capturedTrackBody = body;
       }
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{"events":[]}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{"events":[]}');
     });
 
     runCode(mockData);
@@ -1051,7 +1052,6 @@ scenarios:
 
 - name: Falls back to empty string when no ID fields present
   code: |-
-    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev"
@@ -1064,19 +1064,12 @@ scenarios:
       };
     });
 
-    mock('getContainerVersion', function() {
-      return { previewMode: false };
-    });
-
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) {
         capturedTrackBody = body;
       }
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{"events":[]}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{"events":[]}');
     });
 
     runCode(mockData);
@@ -1088,7 +1081,6 @@ scenarios:
 
 - name: Does not use user_id as anonymousId (must stay anonymous)
   code: |-
-    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev"
@@ -1102,19 +1094,12 @@ scenarios:
       };
     });
 
-    mock('getContainerVersion', function() {
-      return { previewMode: false };
-    });
-
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) {
         capturedTrackBody = body;
       }
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{"events":[]}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{"events":[]}');
     });
 
     runCode(mockData);
@@ -1127,7 +1112,6 @@ scenarios:
 
 - name: Falls back to x-ga-js_client_id when client_id absent
   code: |-
-    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev"
@@ -1141,19 +1125,12 @@ scenarios:
       };
     });
 
-    mock('getContainerVersion', function() {
-      return { previewMode: false };
-    });
-
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) {
         capturedTrackBody = body;
       }
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{"events":[]}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{"events":[]}');
     });
 
     runCode(mockData);
@@ -1180,10 +1157,6 @@ scenarios:
       };
     });
 
-    mock('getContainerVersion', function() {
-      return { previewMode: false };
-    });
-
     let specFetchCalled = false;
     let trackCalled = false;
     mock('sendHttpRequest', function(url, options, body) {
@@ -1193,10 +1166,7 @@ scenarios:
       if (url.indexOf('/inspector/v2/track') !== -1) {
         trackCalled = true;
       }
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200 });
-        return { catch: function() {} };
-      } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1206,7 +1176,6 @@ scenarios:
 
 - name: Validates spec with pinned and allowed values
   code: |-
-    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev"
@@ -1221,10 +1190,6 @@ scenarios:
         item_name: 'Test Product',
         price: 50
       };
-    });
-
-    mock('getContainerVersion', function() {
-      return { previewMode: false };
     });
 
     const specResponse = {
@@ -1272,10 +1237,7 @@ scenarios:
       if (url.indexOf('/inspector/v2/track') !== -1) {
         capturedTrackBody = body;
       }
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200 });
-        return { catch: function() {} };
-      } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1307,7 +1269,6 @@ scenarios:
 
 - name: Captures nested structure of lists (objects, primitives, empty)
   code: |-
-    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "prod"
@@ -1328,19 +1289,12 @@ scenarios:
       };
     });
 
-    mock('getContainerVersion', function() {
-      return { previewMode: false };
-    });
-
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) {
         capturedTrackBody = body;
       }
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200 });
-        return { catch: function() {} };
-      } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1402,7 +1356,6 @@ scenarios:
 
 - name: Dedups list element types and keeps one entry per object element
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
     mock('getAllEventData', function() {
@@ -1414,12 +1367,11 @@ scenarios:
         items: [{ sku: 'A1' }, { color: 'red' }]
       };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1447,7 +1399,6 @@ scenarios:
     mock('getAllEventData', function() {
       return { event_name: 'x', client_id: 'c1', page_hostname: 'example.com' };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let trackCalled = false;
     mock('sendHttpRequest', function(url, options, body) {
@@ -1456,7 +1407,7 @@ scenarios:
         return { then: function() { return { catch: function(onReject) { onReject({ message: 'boom' }); } }; } };
       }
       if (url.indexOf('/inspector/v2/track') !== -1) { trackCalled = true; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1465,7 +1416,6 @@ scenarios:
 
 - name: Captures deeply nested lists (list in object in list)
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
     mock('getAllEventData', function() {
@@ -1476,12 +1426,11 @@ scenarios:
         orders: [ { id: 'o1', items: [ { sku: 'A1' } ] } ]
       };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1513,7 +1462,6 @@ scenarios:
 
 - name: Handles null list elements
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
     mock('getAllEventData', function() {
@@ -1525,12 +1473,11 @@ scenarios:
         mixedNull: [null, 'x']
       };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1553,7 +1500,6 @@ scenarios:
 
 - name: Surfaces failedEventIds when a value violates the spec (dev)
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "dev" };
 
     mock('getAllEventData', function() {
@@ -1564,7 +1510,6 @@ scenarios:
         price: 500
       };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     const specResponse = {
       events: [
@@ -1581,13 +1526,10 @@ scenarios:
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
-        return { then: function(onResolve) {
-          onResolve({ statusCode: 200, body: JSON.stringify(specResponse) });
-          return { catch: function() {} };
-        } };
+        return respond(200, JSON.stringify(specResponse));
       }
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1612,12 +1554,11 @@ scenarios:
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com' };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let specUrl = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specUrl = url; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200, body: '{"events":[]}' }); return { catch: function() {} }; } };
+      return respond(200, '{"events":[]}');
     });
 
     runCode(mockData);
@@ -1632,12 +1573,11 @@ scenarios:
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com' };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let specUrl = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specUrl = url; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200, body: '{"events":[]}' }); return { catch: function() {} }; } };
+      return respond(200, '{"events":[]}');
     });
 
     runCode(mockData);
@@ -1651,12 +1591,11 @@ scenarios:
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com' };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let specUrl = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specUrl = url; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200, body: '{"events":[]}' }); return { catch: function() {} }; } };
+      return respond(200, '{"events":[]}');
     });
 
     runCode(mockData);
@@ -1670,12 +1609,11 @@ scenarios:
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com' };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let specUrl = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specUrl = url; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200, body: '{"events":[]}' }); return { catch: function() {} }; } };
+      return respond(200, '{"events":[]}');
     });
 
     runCode(mockData);
@@ -1689,12 +1627,11 @@ scenarios:
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com' };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let specUrls = [];
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specUrls.push(url); }
-      return { then: function(onResolve) { onResolve({ statusCode: 200, body: '{"events":[]}' }); return { catch: function() {} }; } };
+      return respond(200, '{"events":[]}');
     });
 
     runCode(mockData);
@@ -1708,24 +1645,19 @@ scenarios:
 
 - name: Gateway spec 404 without originHint still sends the event unvalidated (dev)
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "dev", outputReference: "meta-x7k2q" };
 
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com', price: 500 };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
-        return { then: function(onResolve) {
-          onResolve({ statusCode: 404, body: '{"error":"event_not_found","name":"purchase"}' });
-          return { catch: function() {} };
-        } };
+        return respond(404, '{"error":"event_not_found","name":"purchase"}');
       }
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1745,12 +1677,11 @@ scenarios:
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1', page_hostname: 'example.com' };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let specUrls = [];
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specUrls.push(url); }
-      return { then: function(onResolve) { onResolve({ statusCode: 200, body: '{"events":[]}' }); return { catch: function() {} }; } };
+      return respond(200, '{"events":[]}');
     });
 
     runCode({ inspectorKey: "test-key", environment: "dev", originHint: "android" });
@@ -1764,7 +1695,6 @@ scenarios:
 
 - name: Excludes common fields from the schema by default
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
     mock('getAllEventData', function() {
@@ -1778,12 +1708,11 @@ scenarios:
         custom_prop: 'hello'
       };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1801,7 +1730,6 @@ scenarios:
 
 - name: Includes opted-in common fields in the schema
   code: |-
-    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "prod",
@@ -1822,12 +1750,11 @@ scenarios:
         value: 42
       };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1860,7 +1787,6 @@ scenarios:
 
 - name: Opted-in common field also appears inside nested objects
   code: |-
-    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "prod",
@@ -1875,12 +1801,11 @@ scenarios:
         items: [ { currency: 'USD', price: 9 } ]
       };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1906,7 +1831,6 @@ scenarios:
 
 - name: Unknown or empty include rows change nothing
   code: |-
-    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "prod",
@@ -1928,12 +1852,11 @@ scenarios:
         custom_prop: 'hello'
       };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -1946,530 +1869,182 @@ scenarios:
     assertThat(names.indexOf('currency')).isEqualTo(-1);
     assertThat(names.indexOf('custom_prop')).isNotEqualTo(-1);
 
-- name: outputReference set, originHint unset omits originHint key
+- name: Gateway hint fields are normalized, omitted when blank and kept separate from event data (merged)
   code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
-    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
-
-- name: outputReference undefined (old tag instance) omits the key
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
-
-- name: outputReference empty string omits the key
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.outputReference = '';
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
-
-- name: outputReference whitespace-only omits the key
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.outputReference = '   ';
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
-
-- name: outputReference null omits the key
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.outputReference = null;
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
-
-- name: outputReference as an empty object omits the key
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.outputReference = {};
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
-
-- name: outputReference as an empty array omits the key
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.outputReference = [];
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
-
-- name: outputReference as a padded string is trimmed
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.outputReference = '  meta-x7k2q  ';
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
-
-- name: outputReference as a number is stringified
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.outputReference = 42;
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].outputReference).isEqualTo('42');
-
-- name: outputReference as a boolean is stringified
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.outputReference = false;
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].outputReference).isEqualTo('false');
-
-- name: originHint as a plain string is trimmed and sent
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originHint = '  android  ';
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].originHint).isEqualTo('android');
-
-- name: originHint as a number is stringified
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originHint = 123;
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].originHint).isEqualTo('123');
-
-- name: originHint as a boolean is stringified
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originHint = true;
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].originHint).isEqualTo('true');
-
-- name: originHint undefined omits the key
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
-
-- name: originHint null omits the key
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originHint = null;
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
-    // originHint absent means the app-version rule falls back to the container default.
-    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
-
-- name: originHint empty string omits the key
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originHint = '';
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
-    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
-
-- name: originHint whitespace-only omits the key
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originHint = '   ';
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
-    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
-
-- name: originHint as an empty object omits the key
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originHint = {};
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
-
-- name: originHint as an empty array omits the key
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originHint = [];
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
-
-- name: Both outputReference and originHint set are both present
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q", originHint: "android" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
-    assertThat(parsed[0].originHint).isEqualTo('android');
-
-- name: Only originHint set leaves outputReference absent
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
-    assertThat(parsed[0].originHint).isEqualTo('android');
-
-- name: Neither outputReference nor originHint ever appears as a propertyName in eventProperties
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q", originHint: "android" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1', item_name: 'Test Product', price: 9.99 };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const props = JSON.parse(capturedTrackBody)[0].eventProperties;
-    let names = [];
-    for (let i = 0; i < props.length; i++) { names.push(props[i].propertyName); }
-    assertThat(names.indexOf('outputReference')).isEqualTo(-1);
-    assertThat(names.indexOf('originHint')).isEqualTo(-1);
+    function resetDefaults() {
+      mock('getContainerVersion', function() { return { previewMode: false }; });
+      mock('getAllEventData', function() { return { event_name: 'purchase', client_id: 'c1' }; });
+    }
+
+    // outputReference set, originHint unset omits originHint key
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q" };
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
+      assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+    })();
+
+    // Blank or unusable outputReference values omit the key
+    resetDefaults();
+    (function() {
+      // undefined is a tag instance saved before the parameter existed.
+      const values = [undefined, '', '   ', null, {}, []];
+      for (let i = 0; i < values.length; i++) {
+        const sent = runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", outputReference: values[i] });
+        assertThat(sent.hasOwnProperty('outputReference'), 'outputReference value #' + i).isEqualTo(false);
+      }
+    })();
+
+    // outputReference as a padded string is trimmed
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod" };
+      mockData.outputReference = '  meta-x7k2q  ';
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
+    })();
+
+    // outputReference numbers and booleans are stringified
+    resetDefaults();
+    (function() {
+      assertThat(runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", outputReference: 42 }).outputReference).isEqualTo('42');
+      assertThat(runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", outputReference: false }).outputReference).isEqualTo('false');
+    })();
+
+    // originHint as a plain string is trimmed and sent
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod" };
+      mockData.originHint = '  android  ';
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].originHint).isEqualTo('android');
+    })();
+
+    // originHint numbers and booleans are stringified
+    resetDefaults();
+    (function() {
+      assertThat(runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", originHint: 123 }).originHint).isEqualTo('123');
+      assertThat(runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", originHint: true }).originHint).isEqualTo('true');
+    })();
+
+    // Blank or unusable originHint values omit the key
+    resetDefaults();
+    (function() {
+      const values = [undefined, null, '', '   ', {}, []];
+      for (let i = 0; i < values.length; i++) {
+        const sent = runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", originHint: values[i] });
+        assertThat(sent.hasOwnProperty('originHint'), 'originHint value #' + i).isEqualTo(false);
+        // originHint absent means the app-version rule falls back to the container default.
+        assertThat(sent.appVersion, 'originHint value #' + i).isEqualTo('unversioned GTM server-side tag');
+      }
+    })();
+
+    // Both outputReference and originHint set are both present
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q", originHint: "android" };
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].outputReference).isEqualTo('meta-x7k2q');
+      assertThat(parsed[0].originHint).isEqualTo('android');
+    })();
+
+    // Only originHint set leaves outputReference absent
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
+      assertThat(parsed[0].originHint).isEqualTo('android');
+    })();
+
+    // Neither outputReference nor originHint ever appears as a propertyName in eventProperties
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q", originHint: "android" };
+
+      mock('getAllEventData', function() {
+        return { event_name: 'purchase', client_id: 'c1', item_name: 'Test Product', price: 9.99 };
+      });
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const props = JSON.parse(capturedTrackBody)[0].eventProperties;
+      let names = [];
+      for (let i = 0; i < props.length; i++) { names.push(props[i].propertyName); }
+      assertThat(names.indexOf('outputReference')).isEqualTo(-1);
+      assertThat(names.indexOf('originHint')).isEqualTo(-1);
+    })();
 
 - name: Event data property literally named outputReference coexists with the tag-config outputReference
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod", outputReference: "meta-config-value" };
 
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1', outputReference: 42 };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -2487,18 +2062,16 @@ scenarios:
 
 - name: Event data property literally named originHint coexists with the tag-config originHint
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
 
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1', originHint: 'a business value of our own' };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -2518,18 +2091,16 @@ scenarios:
 
 - name: Event data property literally named appVersion coexists with the tag-config origin app version
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod", originAppVersion: "3.1.4" };
 
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1', appVersion: 77 };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -2550,24 +2121,21 @@ scenarios:
 
 - name: Two tag instances differing only in outputReference each carry their own outputReference
   code: |-
-    const JSON = require('JSON');
-
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1', item_name: 'Test Product', price: 9.99 };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBodyA = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBodyA = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
     runCode({ inspectorKey: "test-key", environment: "prod", outputReference: "meta-x7k2q" });
 
     let capturedTrackBodyB = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBodyB = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
     runCode({ inspectorKey: "test-key", environment: "prod", outputReference: "ga4-9v3mp" });
 
@@ -2586,24 +2154,21 @@ scenarios:
 
 - name: Two tag instances differing only in originHint each carry their own originHint
   code: |-
-    const JSON = require('JSON');
-
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'c1', item_name: 'Test Product', price: 9.99 };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBodyA = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBodyA = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
     runCode({ inspectorKey: "test-key", environment: "prod", originHint: "ios" });
 
     let capturedTrackBodyB = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBodyB = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
     runCode({ inspectorKey: "test-key", environment: "prod", originHint: "android" });
 
@@ -2625,18 +2190,16 @@ scenarios:
 
 - name: Backward compatibility - neither hint param set leaves the body unchanged except libVersion
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
     mock('getAllEventData', function() {
       return { event_name: 'test_event', client_id: 'client-abc' };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -2649,7 +2212,7 @@ scenarios:
     assertThat(parsed[0].eventName).isEqualTo('test_event');
     assertThat(parsed[0].streamId).isEqualTo('client-abc');
     assertThat(parsed[0].anonymousId).isEqualTo('client-abc');
-    assertThat(parsed[0].libVersion).isEqualTo('2.3.0');
+    assertThat(parsed[0].libVersion).isEqualTo('2.4.0');
     assertThat(parsed[0].hasOwnProperty('outputReference')).isEqualTo(false);
     assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
     assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
@@ -2679,15 +2242,8 @@ scenarios:
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 500, body: '' });
-        return { catch: function() {} };
-      } };
+      return respond(500, '');
     });
 
     runCode(mockData);
@@ -2697,13 +2253,7 @@ scenarios:
 
 - name: libPlatform is the constant gtm-server and equals the X-Avo-Client header
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     let capturedHeaders = null;
@@ -2712,7 +2262,7 @@ scenarios:
         capturedTrackBody = body;
         capturedHeaders = options.headers;
       }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -2728,18 +2278,12 @@ scenarios:
 
 - name: Body carries no trackingId
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "prod" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -2749,67 +2293,19 @@ scenarios:
     // trackingId is forbidden on this endpoint, not merely unused.
     assertThat(parsed[0].hasOwnProperty('trackingId')).isEqualTo(false);
 
-- name: Inspector key containing a line feed is never sent
+- name: Inspector key containing a line feed, carriage return or NUL is never sent
   code: |-
-    const mockData = { inspectorKey: "test-key\nx-injected: 1", environment: "prod" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let trackCalled = false;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { trackCalled = true; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    // No request at all — the key is not stripped, escaped or truncated.
-    assertThat(trackCalled).isEqualTo(false);
-    assertApi('gtmOnFailure').wasCalled();
-    assertApi('gtmOnSuccess').wasNotCalled();
-
-- name: Inspector key containing a carriage return is never sent
-  code: |-
-    const mockData = { inspectorKey: "test-key\rx-injected: 1", environment: "prod" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let trackCalled = false;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { trackCalled = true; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(trackCalled).isEqualTo(false);
-    assertApi('gtmOnFailure').wasCalled();
-    assertApi('gtmOnSuccess').wasNotCalled();
-
-- name: Inspector key containing a NUL is never sent
-  code: |-
-    const mockData = { inspectorKey: "test-key\u0000", environment: "prod" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let trackCalled = false;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { trackCalled = true; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(trackCalled).isEqualTo(false);
+    const keys = ["test-key\nx-injected: 1", "test-key\rx-injected: 1", "test-key\u0000"];
+    for (let i = 0; i < keys.length; i++) {
+      let trackCalled = false;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { trackCalled = true; }
+        return respond(200);
+      });
+      runCode({ inspectorKey: keys[i], environment: "prod" });
+      // No request at all — the key is not stripped, escaped or truncated.
+      assertThat(trackCalled, 'key #' + i).isEqualTo(false);
+    }
     assertApi('gtmOnFailure').wasCalled();
     assertApi('gtmOnSuccess').wasNotCalled();
 
@@ -2817,15 +2313,10 @@ scenarios:
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
     let trackCalled = false;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/inspector/v2/track') !== -1) { trackCalled = true; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -2836,7 +2327,6 @@ scenarios:
 
 - name: Dev/staging round trip preserves outputReference and originHint through fetchAndValidate
   code: |-
-    const JSON = require('JSON');
     const mockData = {
       inspectorKey: "test-key",
       environment: "dev",
@@ -2847,18 +2337,14 @@ scenarios:
     mock('getAllEventData', function() {
       return { event_name: 'purchase', client_id: 'test-client-123' };
     });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
-        return { then: function(onResolve) {
-          onResolve({ statusCode: 200, body: JSON.stringify({ events: [] }) });
-          return { catch: function() {} };
-        } };
+        return respond(200, JSON.stringify({ events: [] }));
       }
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      return respond(200);
     });
 
     runCode(mockData);
@@ -2872,9 +2358,6 @@ scenarios:
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
     mock('getContainerVersion', function() { return { previewMode: true }; });
 
     // Mechanism: closure-capture on logToConsole, mirroring this file's existing
@@ -2889,10 +2372,7 @@ scenarios:
     });
 
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{"success": false}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{"success": false}');
     });
 
     runCode(mockData);
@@ -2909,9 +2389,6 @@ scenarios:
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
     mock('getContainerVersion', function() { return { previewMode: true }; });
 
     let logCallCount = 0;
@@ -2925,10 +2402,7 @@ scenarios:
     // It contains "success":true, and the drop signal matched in logDropIfAny is
     // "success":false, so the accepted case must stay silent.
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{"samplingRate":1,"success":true}');
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
@@ -2936,10 +2410,7 @@ scenarios:
     // Sub-check 2: the same signal spelled with a space, which the whitespace
     // collapse turns into the compact form before matching.
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{"success": true}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{"success": true}');
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
@@ -2948,11 +2419,6 @@ scenarios:
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
     let capturedUrl = null;
     let capturedMethod = null;
     let capturedHeaders = null;
@@ -2960,10 +2426,7 @@ scenarios:
       capturedUrl = url;
       capturedMethod = options.method;
       capturedHeaders = options.headers;
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{"samplingRate":1,"success":true}');
     });
 
     runCode(mockData);
@@ -2983,27 +2446,15 @@ scenarios:
 
 - name: The body still carries apiKey and env even though v2 reads them from headers
   code: |-
-    const JSON = require('JSON');
     const mockData = { inspectorKey: "test-key", environment: "staging" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
 
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
       if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
-        return { then: function(onResolve) {
-          onResolve({ statusCode: 200, body: JSON.stringify({ events: [] }) });
-          return { catch: function() {} };
-        } };
+        return respond(200, JSON.stringify({ events: [] }));
       }
       if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{"samplingRate":1,"success":true}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{"samplingRate":1,"success":true}');
     });
 
     runCode(mockData);
@@ -3018,11 +2469,6 @@ scenarios:
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
     let logCallCount = 0;
     let capturedLogArgs = null;
     mock('logToConsole', function(msg, arg) {
@@ -3031,10 +2477,7 @@ scenarios:
     });
 
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{"success": false}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{"success": false}');
     });
 
     runCode(mockData);
@@ -3046,9 +2489,6 @@ scenarios:
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
     mock('getContainerVersion', function() { return { previewMode: true }; });
 
     let logCallCount = 0;
@@ -3059,10 +2499,7 @@ scenarios:
     });
 
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{"ok": false, "error": "boom"}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{"ok": false, "error": "boom"}');
     });
 
     runCode(mockData);
@@ -3075,9 +2512,6 @@ scenarios:
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
     mock('getContainerVersion', function() { return { previewMode: true }; });
 
     let logCallCount = 0;
@@ -3089,20 +2523,14 @@ scenarios:
 
     // Sub-check 1: empty body
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '');
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
 
     // Sub-check 2: non-JSON body
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: 'not json' });
-        return { catch: function() {} };
-      } };
+      return respond(200, 'not json');
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
@@ -3110,10 +2538,7 @@ scenarios:
     // Sub-check 3: body 'null' -- valid JSON but not object-shaped, so the shape check
     // rejects it before the signal match.
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: 'null' });
-        return { catch: function() {} };
-      } };
+      return respond(200, 'null');
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
@@ -3121,10 +2546,7 @@ scenarios:
     // Sub-check 4: JSON array body -- valid JSON, not an object; the shape check rejects
     // it, so the success:false nested inside is not read as a top-level signal.
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '[{"success": false}]' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '[{"success": false}]');
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
@@ -3133,10 +2555,7 @@ scenarios:
     // the signal match, which finds neither '"ok":false' nor '"success":false' and
     // returns without logging. Nothing parses the body, so nothing can throw.
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{not-json}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{not-json}');
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
@@ -3145,10 +2564,7 @@ scenarios:
     // rejects it before any string method runs, so the success:false inside it is
     // never seen -- calling .trim() on a non-string would otherwise throw.
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: { success: false } });
-        return { catch: function() {} };
-      } };
+      return respond(200, { success: false });
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
@@ -3156,10 +2572,7 @@ scenarios:
     // Sub-check 7: '{}' is object-shaped and carries no failure signal, so it must pass
     // the shape check and then log nothing.
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{}');
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(0);
@@ -3168,9 +2581,6 @@ scenarios:
   code: |-
     const mockData = { inspectorKey: "test-key", environment: "prod" };
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
     mock('getContainerVersion', function() { return { previewMode: true }; });
 
     let logCallCount = 0;
@@ -3185,10 +2595,7 @@ scenarios:
     // accepted-response path before gtmOnSuccess; substring matching cannot throw.
     // The ok:false signal is present, so it is reported rather than swallowed.
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{"ok":false,}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{"ok":false,}');
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(1);
@@ -3201,10 +2608,7 @@ scenarios:
     // the signal is still found -- the previous character-level guard skipped this.
     logCallCount = 0;
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '{\n  "success": false\n}' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '{\n  "success": false\n}');
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(1);
@@ -3215,261 +2619,356 @@ scenarios:
     // so the log and the decision can never disagree about what was inspected.
     logCallCount = 0;
     mock('sendHttpRequest', function(url, options, body) {
-      return { then: function(onResolve) {
-        onResolve({ statusCode: 200, body: '  {"ok":false}  ' });
-        return { catch: function() {} };
-      } };
+      return respond(200, '  {"ok":false}  ');
     });
     runCode(mockData);
     assertThat(logCallCount).isEqualTo(1);
     assertThat(capturedLogArgs[1]).isEqualTo('{"ok":false}');
 
-- name: originHint set with origin app version sends the provided app version
+- name: Origin app version sets appVersion with and without originHint (merged)
   code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android", originAppVersion: "3.1.4" };
+    function resetDefaults() {
+      mock('getContainerVersion', function() { return { previewMode: false }; });
+      mock('getAllEventData', function() { return { event_name: 'purchase', client_id: 'c1' }; });
+    }
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
+    // originHint set with origin app version sends the provided app version
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android", originAppVersion: "3.1.4" };
 
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].originHint).isEqualTo('android');
+      assertThat(parsed[0].appVersion).isEqualTo('3.1.4');
+    })();
+
+    // originHint set without origin app version sends null app version instead of the container default
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].originHint).isEqualTo('android');
+      // Presence matters here, not only the value: the key has to be on the body as
+      // an explicit null. An absent key would satisfy a value-only check in some
+      // assertion helpers, and the contract is "sent as literal JSON null" — the
+      // same thing every other Inspector sender emits for a source-scoped event
+      // with no version of its own.
+      assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
+      assertThat(parsed[0].appVersion).isEqualTo(null);
+    })();
+
+    // originHint set with whitespace-only origin app version sends null app version
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android", originAppVersion: "   " };
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
+      assertThat(parsed[0].appVersion).isEqualTo(null);
+    })();
+
+    // origin app version without originHint overrides the container default
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", originAppVersion: 42 };
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].appVersion).isEqualTo('42');
+      assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+    })();
+
+    // Blank origin app version without originHint keeps the container default
+    resetDefaults();
+    (function() {
+      // Bottom-right cell of the matrix: no originHint and nothing usable in the
+      // parameter, so the container default must survive untouched.
+      const values = ['', '   '];
+      for (let i = 0; i < values.length; i++) {
+        const sent = runAndCaptureTrack({ inspectorKey: "test-key", environment: "prod", originAppVersion: values[i] });
+        assertThat(sent.appVersion, 'origin app version #' + i).isEqualTo('unversioned GTM server-side tag');
+        assertThat(sent.hasOwnProperty('originHint'), 'origin app version #' + i).isEqualTo(false);
+      }
+    })();
+
+    // origin app version is trimmed
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod" };
+      mockData.originAppVersion = '  3.1.4  ';
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      // Same normalization as the two coordinate fields: a GTM variable that
+      // resolves with stray whitespace must not become a distinct app version.
+      assertThat(parsed[0].appVersion).isEqualTo('3.1.4');
+    })();
+
+    // origin app version as a boolean is stringified like the other parameters
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod" };
+      mockData.originAppVersion = true;
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      // GTM parameters are untyped, so booleans and numbers are stringified rather
+      // than discarded -- the same rule outputReference and originHint follow. Only
+      // objects and arrays (below) count as "nothing sendable".
+      assertThat(parsed[0].appVersion).isEqualTo('true');
+    })();
+
+    // origin app version as an object is treated as empty (null when originHint is set)
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
+      mockData.originAppVersion = {};
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
+      assertThat(parsed[0].appVersion).isEqualTo(null);
+    })();
+
+    // origin app version as an array is treated as empty (container default without originHint)
+    resetDefaults();
+    (function() {
+      const mockData = { inspectorKey: "test-key", environment: "prod" };
+      mockData.originAppVersion = [];
+
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
+        return respond(200);
+      });
+
+      runCode(mockData);
+
+      assertThat(capturedTrackBody).isNotEqualTo(null);
+      const parsed = JSON.parse(capturedTrackBody);
+      assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
+    })();
+
+- name: Preview mode sends a prod or staging tag to dev and validates it
+  code: |-
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    const environments = ['prod', 'staging'];
+    for (let i = 0; i < environments.length; i++) {
+      let specFetchCalled = false;
+      let capturedHeaders = null;
+      let capturedTrackBody = null;
+      mock('sendHttpRequest', function(url, options, body) {
+        if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
+          specFetchCalled = true;
+          return respond(200, JSON.stringify({ events: [] }));
+        }
+        if (url.indexOf('/inspector/v2/track') !== -1) {
+          capturedHeaders = options.headers;
+          capturedTrackBody = body;
+        }
+        return respond(200, '{"samplingRate":1,"success":true}');
+      });
+
+      runCode({ inspectorKey: "test-key", environment: environments[i], previewSendsToDev: true });
+
+      assertThat(capturedHeaders['env'], environments[i]).isEqualTo('dev');
+      assertThat(JSON.parse(capturedTrackBody)[0].env, environments[i]).isEqualTo('dev');
+      // dev takes the validation path, so the spec is fetched first.
+      assertThat(specFetchCalled, environments[i]).isEqualTo(true);
+    }
+    assertApi('gtmOnSuccess').wasCalled();
+
+- name: Preview mode with the checkbox unchecked keeps the Environment setting
+  code: |-
+    const mockData = { inspectorKey: "test-key", environment: "prod", previewSendsToDev: false };
+
+    mock('getContainerVersion', function() { return { previewMode: true }; });
+
+    let specFetchCalled = false;
+    let capturedHeaders = null;
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specFetchCalled = true; }
+      if (url.indexOf('/inspector/v2/track') !== -1) {
+        capturedHeaders = options.headers;
+        capturedTrackBody = body;
+      }
+      return respond(200, '{"samplingRate":1,"success":true}');
     });
 
     runCode(mockData);
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].originHint).isEqualTo('android');
-    assertThat(parsed[0].appVersion).isEqualTo('3.1.4');
+    assertThat(capturedHeaders['env']).isEqualTo('prod');
+    assertThat(JSON.parse(capturedTrackBody)[0].env).isEqualTo('prod');
+    assertThat(specFetchCalled).isEqualTo(false);
 
-- name: originHint set without origin app version sends null app version instead of the container default
+- name: Preview mode on a tag saved before the checkbox existed keeps the Environment setting
   code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].originHint).isEqualTo('android');
-    // Presence matters here, not only the value: the key has to be on the body as
-    // an explicit null. An absent key would satisfy a value-only check in some
-    // assertion helpers, and the contract is "sent as literal JSON null" — the
-    // same thing every other Inspector sender emits for a source-scoped event
-    // with no version of its own.
-    assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
-    assertThat(parsed[0].appVersion).isEqualTo(null);
-
-- name: originHint set with whitespace-only origin app version sends null app version
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android", originAppVersion: "   " };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
-    assertThat(parsed[0].appVersion).isEqualTo(null);
-
-- name: origin app version without originHint overrides the container default
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod", originAppVersion: 42 };
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].appVersion).isEqualTo('42');
-    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
-
-- name: origin app version empty string without originHint keeps the container default
-  code: |-
-    const JSON = require('JSON');
+    // No previewSendsToDev key at all, as on a tag instance saved before the
+    // parameter existed: it must not opt in to the override.
     const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originAppVersion = '';
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
 
+    let specFetchCalled = false;
+    let capturedHeaders = null;
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specFetchCalled = true; }
+      if (url.indexOf('/inspector/v2/track') !== -1) {
+        capturedHeaders = options.headers;
+        capturedTrackBody = body;
+      }
+      return respond(200, '{"samplingRate":1,"success":true}');
     });
 
     runCode(mockData);
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    // Bottom-right cell of the matrix: no originHint and nothing usable in the
-    // parameter, so the container default must survive untouched.
-    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
-    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+    assertThat(capturedHeaders['env']).isEqualTo('prod');
+    assertThat(JSON.parse(capturedTrackBody)[0].env).isEqualTo('prod');
+    assertThat(specFetchCalled).isEqualTo(false);
 
-- name: origin app version whitespace-only without originHint keeps the container default
+- name: Preview mode on a prod gateway tag fetches the spec with its gateway coordinates
   code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originAppVersion = '   ';
+    const mockData = { inspectorKey: "test-key", environment: "prod", previewSendsToDev: true, originHint: "web app", outputReference: "meta/x7k2q" };
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
+    mock('getContainerVersion', function() { return { previewMode: true }; });
 
+    let specUrl = null;
+    let capturedHeaders = null;
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) {
+        specUrl = url;
+        return respond(200, JSON.stringify({ events: [] }));
+      }
+      if (url.indexOf('/inspector/v2/track') !== -1) {
+        capturedHeaders = options.headers;
+        capturedTrackBody = body;
+      }
+      return respond(200, '{"samplingRate":1,"success":true}');
     });
 
     runCode(mockData);
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
-    assertThat(parsed[0].hasOwnProperty('originHint')).isEqualTo(false);
+    assertThat(specUrl).isEqualTo('https://api.avo.app/trackingPlan/eventSpec?apiKey=test-key&streamId=c1&eventName=purchase&originHint=web%20app&outputReference=meta%2Fx7k2q');
+    assertThat(capturedHeaders['env']).isEqualTo('dev');
+    const sent = JSON.parse(capturedTrackBody)[0];
+    assertThat(sent.env).isEqualTo('dev');
+    assertThat(sent.originHint).isEqualTo('web app');
+    assertThat(sent.outputReference).isEqualTo('meta/x7k2q');
 
-- name: origin app version is trimmed
+- name: Live traffic keeps the Environment setting with the checkbox checked
   code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originAppVersion = '  3.1.4  ';
+    const mockData = { inspectorKey: "test-key", environment: "prod", previewSendsToDev: true };
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
+    let specFetchCalled = false;
+    let capturedHeaders = null;
     let capturedTrackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      if (url.indexOf('/trackingPlan/eventSpec') !== -1) { specFetchCalled = true; }
+      if (url.indexOf('/inspector/v2/track') !== -1) {
+        capturedHeaders = options.headers;
+        capturedTrackBody = body;
+      }
+      return respond(200, '{"samplingRate":1,"success":true}');
     });
 
     runCode(mockData);
 
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    // Same normalization as the two coordinate fields: a GTM variable that
-    // resolves with stray whitespace must not become a distinct app version.
-    assertThat(parsed[0].appVersion).isEqualTo('3.1.4');
+    assertThat(capturedHeaders['env']).isEqualTo('prod');
+    assertThat(JSON.parse(capturedTrackBody)[0].env).isEqualTo('prod');
+    assertThat(specFetchCalled).isEqualTo(false);
 
-- name: origin app version as a boolean is stringified like the other parameters
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originAppVersion = true;
+setup: |-
+  const JSON = require('JSON');
 
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
+  // Defaults for every scenario. A scenario that needs other values mocks
+  // the API again, and its own mock wins.
+  mock('getContainerVersion', function() { return { previewMode: false }; });
+  mock('getAllEventData', function() { return { event_name: 'purchase', client_id: 'c1' }; });
 
-    let capturedTrackBody = null;
+  // A sendHttpRequest result that resolves with this status code and body.
+  function respond(statusCode, body) {
+    return { then: function(onResolve) {
+      onResolve({ statusCode: statusCode, body: body });
+      return { catch: function() {} };
+    } };
+  }
+
+  // Runs the tag with this data and returns the first event of its track
+  // request body. Fails the test when no track request was sent.
+  function runAndCaptureTrack(data) {
+    let trackBody = null;
     mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
+      if (url.indexOf('/inspector/v2/track') !== -1) { trackBody = body; }
+      return respond(200);
     });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    // GTM parameters are untyped, so booleans and numbers are stringified rather
-    // than discarded -- the same rule outputReference and originHint follow. Only
-    // objects and arrays (below) count as "nothing sendable".
-    assertThat(parsed[0].appVersion).isEqualTo('true');
-
-- name: origin app version as an object is treated as empty (null when originHint is set)
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod", originHint: "android" };
-    mockData.originAppVersion = {};
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].hasOwnProperty('appVersion')).isEqualTo(true);
-    assertThat(parsed[0].appVersion).isEqualTo(null);
-
-- name: origin app version as an array is treated as empty (container default without originHint)
-  code: |-
-    const JSON = require('JSON');
-    const mockData = { inspectorKey: "test-key", environment: "prod" };
-    mockData.originAppVersion = [];
-
-    mock('getAllEventData', function() {
-      return { event_name: 'purchase', client_id: 'c1' };
-    });
-    mock('getContainerVersion', function() { return { previewMode: false }; });
-
-    let capturedTrackBody = null;
-    mock('sendHttpRequest', function(url, options, body) {
-      if (url.indexOf('/inspector/v2/track') !== -1) { capturedTrackBody = body; }
-      return { then: function(onResolve) { onResolve({ statusCode: 200 }); return { catch: function() {} }; } };
-    });
-
-    runCode(mockData);
-
-    assertThat(capturedTrackBody).isNotEqualTo(null);
-    const parsed = JSON.parse(capturedTrackBody);
-    assertThat(parsed[0].appVersion).isEqualTo('unversioned GTM server-side tag');
-
+    runCode(data);
+    assertThat(trackBody).isNotEqualTo(null);
+    return JSON.parse(trackBody)[0];
+  }
 
 ___NOTES___
 
