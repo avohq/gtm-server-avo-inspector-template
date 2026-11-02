@@ -16,7 +16,7 @@ homepage: "https://www.avo.app"
 documentation: "https://www.avo.app/docs/data-design/start-using-inspector"
 versions:
   # Latest version
-  - sha: <pending-merge-sha>
+  - sha: 4c47a85df1e62cfc9945c65b6dd767965124e6fb
     changeNotes: |2
       Feature: in GTM Preview mode the tag can now send to the development environment, whatever the Environment setting, matching the web GTM template. While this is enabled, previewed events never reach production data, and they are validated against the tracking plan like any dev event. Live traffic is unchanged and always uses the Environment setting. This is controlled by a new "Send to the development environment in Preview mode" checkbox, checked by default on new tags. Tag instances saved before it existed keep their previous behavior, sending to the configured environment in Preview mode too, until the tag is next saved in the GTM editor: the editor shows the box checked on such a tag, so saving it turns the override on unless the box is unchecked first. libVersion 2.4.0.
   # Older versions
